@@ -467,3 +467,6 @@ Unknown order product in a return line.: Une ligne de la demande ne correspond �
 This product line does not belong to the order.: Ce produit n'appartient pas à cette commande.
 The postage of this order is already included in another return.: Les frais de port de cette commande sont déjà portés par un autre retour.
 Return %product%: Retourner %product%
+Tell us who you are to carry on with your order.: Indiquez-nous qui vous êtes pour poursuivre votre commande.
+Continue: Continuer
+Finish the step above to open this one.: Terminez l'étape précédente pour ouvrir celle-ci.

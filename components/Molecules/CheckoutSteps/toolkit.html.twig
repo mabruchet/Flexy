@@ -26,4 +26,17 @@
         />
     </div>
 
+    {# ── Current by step code ────────────────────────────────────────────── #}
+
+    <div class="Story-section">
+        <h4 class="Story-title">Current by step code — how the checkout drives it</h4>
+        <div class="Story-col">
+            <span class="Story-label">entries carry the `code` of a configured checkout step, `current` names one; a wording from the `checkout_step_i18n` table arrives already translated, so `translate: false`</span>
+            <twig:Molecules:CheckoutSteps:Base
+                :steps="[{code: 'cart', text: 'Your cart', link: '#', translate: false}, {code: 'delivery', text: 'Delivery', link: '#', translate: false}, {code: 'payment', text: 'Payment', link: '#', translate: false}, {code: 'confirmation', text: 'Confirmation', translate: false}]"
+                current="delivery"
+            />
+        </div>
+    </div>
+
 </div>

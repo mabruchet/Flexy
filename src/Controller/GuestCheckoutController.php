@@ -14,8 +14,9 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Controller;
 
-use FlexyBundle\Components\Molecules\CheckoutSteps\Base as CheckoutSteps;
 use FlexyBundle\Form\GuestCheckoutForm;
+use FlexyBundle\Service\CheckoutStepRouteResolver;
+use FlexyBundle\Service\CheckoutTrail;
 use FlexyBundle\Service\GuestAddressCreator;
 use FlexyBundle\Service\GuestCheckoutGate;
 use Propel\Runtime\Exception\PropelException;
@@ -34,6 +35,8 @@ use Thelia\Domain\Customer\Exception\GuestCheckoutEmailAlreadyRegisteredExceptio
 use Thelia\Domain\Localization\Service\LangService;
 use Thelia\Form\BaseForm;
 use Thelia\Form\Exception\FormValidationException;
+use Thelia\Model\Cart;
+use Thelia\Model\CheckoutStep;
 use Thelia\Model\Customer;
 
 /**
@@ -47,21 +50,30 @@ use Thelia\Model\Customer;
 #[Route('/checkout', name: 'checkout_')]
 class GuestCheckoutController extends FlexyController
 {
+    /**
+     * @throws PropelException
+     */
     #[Route('/identify', name: 'identify', methods: ['GET'])]
     public function identify(
         GuestCheckoutGate $guestCheckoutGate,
         CartFacade $cartFacade,
         CartGuard $cartGuard,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
     ): Response {
-        // Nothing left to ask of someone the session already knows, guest or not.
-        if ($guestCheckoutGate->mayEnterCheckout()) {
-            return $this->generateRedirect($this->generateUrl('checkout_delivery'));
-        }
+        $cart = $cartFacade->getCartFromSession();
 
         // There is nothing to identify oneself for without a cart, and every way out of
         // this page leads to a step that would bounce straight back to the cart anyway.
-        if ($this->cartIsEmpty($cartFacade, $cartGuard)) {
+        // Asked before the session is looked at, because the step to send someone the
+        // session knows on to is read off that very cart.
+        if (null === $cart || $this->cartIsEmpty($cartGuard, $cart)) {
             return $this->generateRedirect($this->generateUrl('checkout_cart'));
+        }
+
+        // Nothing left to ask of someone the session already knows, guest or not.
+        if ($guestCheckoutGate->mayEnterCheckout()) {
+            return $this->generateRedirect($routes->pathAfter($cart, CheckoutStep::CODE_CART));
         }
 
         // The page exists to present a choice, and there is none left when this cart
@@ -71,9 +83,12 @@ class GuestCheckoutController extends FlexyController
             return $this->generateRedirect($this->generateUrl('customer_login'));
         }
 
-        return $this->renderIdentificationPage($guestCheckoutGate);
+        return $this->renderIdentificationPage($guestCheckoutGate, $routes, $trail, $cart);
     }
 
+    /**
+     * @throws PropelException
+     */
     #[Route('/identify', name: 'identify_guest', methods: ['POST'])]
     public function identifyAsGuest(
         GuestCheckoutGate $guestCheckoutGate,
@@ -82,14 +97,26 @@ class GuestCheckoutController extends FlexyController
         LangService $langService,
         GuestRegistrationLimiter $guestRegistrationLimiter,
         SessionInterface $session,
+        CartFacade $cartFacade,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
     ): Response {
+        // Read, never created. This action is only ever reached by a post, and a post
+        // arriving without a cart in session is a stale page or a forged one: opening a
+        // cart row for it would let anybody write to the cart table without so much as a
+        // click on the shop, which is what the GET side of this page refuses by sending
+        // a cartless visitor back to the cart. Nothing below needs a saved cart — it is
+        // read to know which step follows the cart in this shop's tunnel, and a cart with
+        // nothing in it answers that. The stand-in is never saved.
+        $cart = $cartFacade->getCartFromSession() ?? new Cart();
+
         // A session that already holds someone is never taken back down to a guest. The
         // form is served to visitors with no session at all, so a submission arriving
         // with one is either a stale page or a forged post, and honouring it would swap
         // a signed-in customer for a passwordless row — quietly, on a POST that carries
         // no credential.
         if ($guestCheckoutGate->mayEnterCheckout()) {
-            return $this->generateRedirect($this->generateUrl('checkout_delivery'));
+            return $this->generateRedirect($routes->pathAfter($cart, CheckoutStep::CODE_CART));
         }
 
         // Asked again on the submission, not only on the page that offered it: between
@@ -107,6 +134,9 @@ class GuestCheckoutController extends FlexyController
         } catch (FormValidationException $e) {
             return $this->renderIdentificationPageWithError(
                 $guestCheckoutGate,
+                $routes,
+                $trail,
+                $cart,
                 $form,
                 $this->translator->trans('Please check your input: %s', ['%s' => $e->getMessage()]),
             );
@@ -120,6 +150,9 @@ class GuestCheckoutController extends FlexyController
         if (!$guestRegistrationLimiter->allows((string) $data['email'])) {
             return $this->renderIdentificationPageWithError(
                 $guestCheckoutGate,
+                $routes,
+                $trail,
+                $cart,
                 $form,
                 $this->translator->trans('Too many attempts. Please try again later.'),
             );
@@ -144,6 +177,9 @@ class GuestCheckoutController extends FlexyController
         } catch (GuestCheckoutEmailAlreadyRegisteredException) {
             return $this->renderIdentificationPageWithError(
                 $guestCheckoutGate,
+                $routes,
+                $trail,
+                $cart,
                 $form,
                 $this->translator->trans('This email address already has an account. Please sign in to place your order.'),
                 signInFirst: true,
@@ -152,7 +188,7 @@ class GuestCheckoutController extends FlexyController
 
         $guestCheckoutGate->signIn($guest, $this->createAddresses($guestAddressCreator, $guest, $data));
 
-        return $this->generateRedirect($this->generateUrl('checkout_delivery'));
+        return $this->generateRedirect($routes->pathAfter($cart, CheckoutStep::CODE_CART));
     }
 
     /**
@@ -221,14 +257,8 @@ class GuestCheckoutController extends FlexyController
     /**
      * @throws PropelException
      */
-    private function cartIsEmpty(CartFacade $cartFacade, CartGuard $cartGuard): bool
+    private function cartIsEmpty(CartGuard $cartGuard, Cart $cart): bool
     {
-        $cart = $cartFacade->getCartFromSession();
-
-        if (null === $cart) {
-            return true;
-        }
-
         try {
             $cartGuard->checkCartNotEmpty($cart);
         } catch (EmptyCartException) {
@@ -267,6 +297,9 @@ class GuestCheckoutController extends FlexyController
      */
     private function renderIdentificationPageWithError(
         GuestCheckoutGate $guestCheckoutGate,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
+        Cart $cart,
         BaseForm $form,
         string $message,
         bool $signInFirst = false,
@@ -276,18 +309,37 @@ class GuestCheckoutController extends FlexyController
 
         return $this->renderIdentificationPage(
             $guestCheckoutGate,
+            $routes,
+            $trail,
+            $cart,
             $signInFirst,
             Response::HTTP_UNPROCESSABLE_ENTITY,
         );
     }
 
+    /**
+     * @throws PropelException
+     */
     private function renderIdentificationPage(
         GuestCheckoutGate $guestCheckoutGate,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
+        Cart $cart,
         bool $signInFirst = false,
         int $status = Response::HTTP_OK,
     ): Response {
+        // This page is not a step of the tunnel: it stands in front of the one that
+        // follows the cart, and it borrows that step's place on the bar — which is what
+        // `identifiesAfterTheCart` renames. Which step that is comes from the
+        // configuration, so on a shop with no delivery step it is the payment.
+        $stepItStandsFor = $routes->codeAfter($cart, CheckoutStep::CODE_CART) ?? CheckoutStep::CODE_CART;
+
         return $this->render('checkout-identify', [
-            'current' => CheckoutSteps::DELIVERY,
+            'current' => $stepItStandsFor,
+            'steps' => $trail->of($cart, identifiesAfterTheCart: true),
+            'previous_step_url' => $routes->pathFor(CheckoutStep::CODE_CART),
+            // Where signing in, or identifying as a guest, carries on to.
+            'next_step_url' => $routes->pathAfter($cart, CheckoutStep::CODE_CART),
             'guest_checkout_offered' => $guestCheckoutGate->isOfferedForCurrentCart(),
             // Set when the address the visitor typed already has an account: the page then
             // opens on the login block instead of the form that cannot go through.

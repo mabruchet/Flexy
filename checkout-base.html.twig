@@ -44,15 +44,14 @@
 
     {{ theme_hook('checkout.top') }}
 
+    {# The steps come from the shop's configuration, through CheckoutTrail: a step the
+       merchant turned off, reordered or renamed, and one left out for a cart with
+       nothing to ship, are gone from the bar without a template having to know. Every
+       page of the tunnel is handed `steps` and the code of the step it shows. #}
     {% block checkoutSteps %}
         <twig:Molecules:CheckoutSteps:Base
-            :steps="[
-                {text: 'Your cart', link: path('checkout_cart')},
-                {text: 'Delivery', link: path('checkout_delivery')},
-                {text: 'Payment', link: path('checkout_payment')},
-                {text: 'Confirmation'},
-            ]"
-            :current="current"
+            :steps="steps|default([])"
+            :current="current|default(null)"
         />
     {% endblock %}
 
