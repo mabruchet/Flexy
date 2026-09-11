@@ -36,6 +36,8 @@ internal:
 
     # Checkout steps, each guarded by the cart state its controller checks
     - checkout-cart
+    # The one-page form of the tunnel, served by the cart route when the shop asks for it
+    - checkout-onepage
     - checkout-delivery
     - checkout-payment
     - checkout-confirm

@@ -1,6 +1,6 @@
-{% props steps = [], current = 1, noCart = false, step = null %}
-
-{% set percent = (current / steps|length * 100)|round %}
+{% set steps = this.steps %}
+{% set current = this.currentPosition %}
+{% set percent = steps|length > 0 ? (current / steps|length * 100)|round : 0 %}
 
 <div class="{{ ('CheckoutSteps ' ~ attributes.render('class'))|tailwind_merge }}" {{ attributes.without('class') }}>
     <div class="flex items-center">
@@ -19,7 +19,7 @@
                         {% if current != loop.length and loop.index <= current %}
                             {% if step_item.link %}<a href="{{ step_item.link }}" class="no-underline">{% endif %}
                         {% endif %}
-                        {{ step_item.text|trans }}
+                        {{- step_item.translate|default(true) ? step_item.text|trans : step_item.text -}}
                         {% if current != loop.length and loop.index <= current %}
                             {% if step_item.link %}</a>{% endif %}
                         {% endif %}
@@ -28,7 +28,7 @@
             {% endfor %}
         </div>
     </div>
-    {% if not noCart %}
+    {% if not this.noCart %}
         <twig:Organisms:Summary:Mini />
     {% endif %}
 </div>

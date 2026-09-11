@@ -2,20 +2,6 @@
 
 {% block title %}{{ 'Identification'|trans }}{% endblock %}
 
-{# The stepper names this stop "Identification": the visitor is not on the delivery
-   page yet, and the delivery link would only bounce back here. #}
-{% block checkoutSteps %}
-    <twig:Molecules:CheckoutSteps:Base
-        :steps="[
-            {text: 'Your cart', link: path('checkout_cart')},
-            {text: 'Identification'},
-            {text: 'Payment'},
-            {text: 'Confirmation'},
-        ]"
-        :current="current"
-    />
-{% endblock %}
-
 {% block checkoutContent %}
     {% set loginForm = getForm('thelia.front.customer.login') %}
     {% form_theme loginForm with flexy_form_themes only %}
@@ -45,7 +31,9 @@
             method: 'POST',
             class: 'flex flex-col gap-6',
         }}) }}
-        {{ form_row(loginForm.success_url, {value: path('checkout_delivery')}) }}
+        {# Where signing in carries on to: the step the configuration puts after the
+           cart, which is the one this page stands in front of. #}
+        {{ form_row(loginForm.success_url, {value: next_step_url}) }}
         {{ form_row(loginForm.error_url, {value: path('checkout_identify')}) }}
         <input type="hidden" name="{{ field_name(loginForm.account) }}" value="1">
         {{ form_row(loginForm.email, {label: 'Email'|trans, placeholder: 'Your email'|trans}) }}
@@ -91,7 +79,7 @@
     <twig:Molecules:Link:Base
         iconLeft="chevron-left"
         customText="{{ 'Previous Step'|trans }}"
-        href="{{ path('checkout_cart') }}"
+        href="{{ previous_step_url }}"
         class="gap-2 mt-6 inline-flex"
     />
 {% endblock %}

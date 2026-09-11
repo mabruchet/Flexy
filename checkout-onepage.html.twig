@@ -1,0 +1,35 @@
+{% extends 'checkout-base.html.twig' %}
+
+{% block title %}{{ 'Checkout'|trans }}{% endblock %}
+
+{# The whole tunnel on one screen, which is what `checkout_display_mode` asked for. The
+   same steps and the same components as the several-screen form: this page stacks them,
+   it does not hold a second checkout. #}
+{% block checkoutContent %}
+    {# The same hooks the cart page renders, and for the same reason: this page *is* the
+       cart page when the shop lays the tunnel out on one screen, and a module hanging a
+       reassurance block or a cross-sell there must not lose it to a display setting.
+       Outside the live component on purpose — what a module renders is not re-rendered
+       on every click of the accordion. #}
+    {{ theme_hook('cart.top') }}
+    <twig:Organisms:CheckoutOnePage:Base />
+    {{ theme_hook('cart.bottom') }}
+{% endblock %}
+
+{% block checkoutSummary %}
+    {%- if not emptyCart -%}
+        <twig:Organisms:Summary:Checkout />
+    {%- endif -%}
+{% endblock %}
+
+{# The order button watches the last step the buyer has something to do at, so it only
+   comes alive once every section above is settled — the refusal itself stays where it
+   has always been, at /checkout/pay. #}
+{% block checkoutNextButton %}
+    {%- if not emptyCart -%}
+        <twig:Organisms:NextButton:Base
+            :step="pay_step"
+            href="{{ next_step_url }}"
+        />
+    {%- endif -%}
+{% endblock %}

@@ -14,8 +14,9 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Controller;
 
-use FlexyBundle\Components\Molecules\CheckoutSteps\Base as CheckoutSteps;
 use FlexyBundle\Service\CartStockService;
+use FlexyBundle\Service\CheckoutStepRouteResolver;
+use FlexyBundle\Service\CheckoutTrail;
 use FlexyBundle\Service\GuestCheckoutGate;
 use FlexyBundle\Service\GuestOrderTracking;
 use FlexyBundle\Service\PlacedOrderMemory;
@@ -26,7 +27,6 @@ use Symfony\Component\Routing\Attribute\Route;
 use Thelia\Core\HttpFoundation\Request;
 use Thelia\Core\HttpFoundation\Session\Session;
 use Thelia\Core\HttpKernel\Exception\RedirectException;
-use Thelia\Domain\Customer\Service\AuthenticationReturnUrl;
 use Thelia\Domain\Cart\CartFacade;
 use Thelia\Domain\Cart\Service\CartGuard;
 use Thelia\Domain\Checkout\CheckoutFacade;
@@ -37,9 +37,24 @@ use Thelia\Domain\Checkout\Exception\IncompleteInvoiceAddressException;
 use Thelia\Domain\Checkout\Exception\InvalidDeliveryException;
 use Thelia\Domain\Checkout\Exception\MissingAddressException;
 use Thelia\Domain\Checkout\Exception\MissingConsentException;
+use Thelia\Domain\Checkout\Service\CheckoutProgressionService;
+use Thelia\Domain\Customer\Service\AuthenticationReturnUrl;
 use Thelia\Domain\Shipping\ShippingFacade;
+use Thelia\Model\Cart;
+use Thelia\Model\CheckoutStep;
 use Thelia\Model\Order;
 
+/**
+ * The checkout, as the shop configured it.
+ *
+ * No action of a step decides on its own whether the buyer may be there: it asks the
+ * progression, which reads the `checkout_step` table and the cart in hand. A step the
+ * merchant turned off, one left out for a cart with nothing to ship, and one that never
+ * existed all answer the same thing — there is no such screen in this tunnel — and all
+ * three send the buyer to the first step they still have something to do at. None of it
+ * is a refusal: the refusals stay at the placement, where the core checks the whole
+ * order however short the tunnel it was filled in through.
+ */
 #[Route('/checkout', name: 'checkout_')]
 class CheckoutController extends FlexyController
 {
@@ -49,15 +64,37 @@ class CheckoutController extends FlexyController
         return $this->generateRedirect('/checkout/cart');
     }
 
+    /**
+     * @throws PropelException
+     */
     #[Route('/cart', name: 'cart')]
     public function cartAction(
         CheckoutFacade $checkoutFacade,
         CartGuard $cartGuard,
         CartFacade $cartFacade,
         GuestCheckoutGate $guestCheckoutGate,
+        ShippingFacade $shippingFacade,
+        CheckoutProgressionService $progression,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
     ): Response {
         $cart = $cartFacade->getOrCreateFromSession();
+
+        // The trail has to name the step the "next" button actually leads to. A visitor
+        // the session does not know yet is taken to the identification page whenever
+        // this cart may be ordered without an account.
+        $identifiesNext = !$guestCheckoutGate->mayEnterCheckout() && $guestCheckoutGate->isOfferedForCurrentCart();
+
+        if ($routes->isOnePage()) {
+            return $this->renderTheWholeTunnel($cart, $cartGuard, $shippingFacade, $progression, $routes, $trail, $identifiesNext);
+        }
+
         $checkoutFacade->resetCheckout();
+
+        // The reset gave the cart its delivery and its payment back: what the progression
+        // answered a moment ago was about the cart as it was before that.
+        $progression->forget();
+
         $emptyCart = false;
 
         try {
@@ -68,76 +105,102 @@ class CheckoutController extends FlexyController
 
         return $this->render('checkout-cart', [
             'emptyCart' => $emptyCart,
-            'current' => CheckoutSteps::CART,
-            // The trail has to name the step the "next" button actually leads to. A
-            // visitor the session does not know yet is taken to the identification page
-            // whenever this cart may be ordered without an account.
-            'identifies_next' => !$guestCheckoutGate->mayEnterCheckout() && $guestCheckoutGate->isOfferedForCurrentCart(),
+            'current' => CheckoutStep::CODE_CART,
+            'steps' => $trail->of($cart, $identifiesNext),
+            'next_step_url' => $routes->pathAfter($cart, CheckoutStep::CODE_CART),
         ]);
     }
 
+    /**
+     * @throws PropelException
+     */
     #[Route('/delivery', name: 'delivery')]
     public function deliveryModesAction(
         CartFacade $cartFacade,
-        CartGuard $cartGuard,
-        ShippingFacade $shippingFacade,
         GuestCheckoutGate $guestCheckoutGate,
+        CheckoutProgressionService $progression,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
     ): Response {
         $this->checkCheckoutAccess($guestCheckoutGate);
+
         $cart = $cartFacade->getOrCreateFromSession();
 
-        try {
-            $cartGuard->checkCartNotEmpty($cart);
-
-            if ($cart->isVirtual()) {
-                $shippingFacade->setupVirtualDelivery($cart);
-            }
-
-            return $this->render('checkout-delivery', [
-                'current' => CheckoutSteps::DELIVERY,
-            ]);
-        } catch (EmptyCartException $e) {
-            throw new RedirectException($this->generateUrl('checkout_cart'), Response::HTTP_FOUND, $e->getMessage());
+        // On a one-page checkout the delivery is a section of the cart page, so this
+        // route has no screen of its own left to serve.
+        if ($routes->isOnePage() || !$progression->isReachable($cart, CheckoutStep::CODE_DELIVERY)) {
+            return $this->generateRedirect($routes->pathOfTheFirstIncompleteStep($cart));
         }
-    }
 
-    #[Route('/payment', name: 'payment')]
-    public function paymentAction(
-        CartGuard $cartGuard,
-        CartFacade $cartFacade,
-        GuestCheckoutGate $guestCheckoutGate,
-    ): Response {
-        $this->checkCheckoutAccess($guestCheckoutGate);
-
-        try {
-            // Deliberately not guarded on the legal identifiers here: the billing address form
-            // lives on this very page, so refusing to render it would leave the buyer with no
-            // way to supply what is missing. The rule is enforced on leaving the step instead,
-            // by CheckoutValidationService, and surfaced early by the NextButton.
-            $cart = $cartFacade->getOrCreateFromSession();
-            $cartGuard->checkCartNotEmpty($cart);
-            $cartGuard->checkValidDelivery($cart);
-
-            return $this->render('checkout-payment', [
-                'current' => CheckoutSteps::PAYMENT,
-            ]);
-        } catch (EmptyCartException $e) {
-            throw new RedirectException($this->generateUrl('checkout_cart'), Response::HTTP_FOUND, $e->getMessage());
-        } catch (MissingAddressException|InvalidDeliveryException $e) {
-            throw new RedirectException($this->generateUrl('checkout_delivery'), Response::HTTP_FOUND, $e->getMessage());
-        }
-    }
-
-    #[Route('/gateway', name: 'gateway')]
-    public function gatewayAction(GuestCheckoutGate $guestCheckoutGate): Response
-    {
-        $this->checkCheckoutAccess($guestCheckoutGate);
-
-        return $this->render('checkout-gateway', [
-            'current' => CheckoutSteps::GATEWAY,
+        return $this->render('checkout-delivery', [
+            'current' => CheckoutStep::CODE_DELIVERY,
+            'steps' => $trail->of($cart),
+            'next_step_url' => $routes->pathAfter($cart, CheckoutStep::CODE_DELIVERY),
+            'previous_step_url' => $routes->pathBefore($cart, CheckoutStep::CODE_DELIVERY),
         ]);
     }
 
+    /**
+     * @throws PropelException
+     */
+    #[Route('/payment', name: 'payment')]
+    public function paymentAction(
+        CartFacade $cartFacade,
+        GuestCheckoutGate $guestCheckoutGate,
+        ShippingFacade $shippingFacade,
+        CheckoutProgressionService $progression,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
+    ): Response {
+        $this->checkCheckoutAccess($guestCheckoutGate);
+
+        $cart = $cartFacade->getOrCreateFromSession();
+
+        if ($routes->isOnePage()) {
+            return $this->generateRedirect($routes->pathOfTheFirstIncompleteStep($cart));
+        }
+
+        $this->settleTheDeliveryOfACartWithNothingToShip($cart, $shippingFacade, $progression);
+
+        // Deliberately not guarded on the legal identifiers here: the billing address form
+        // lives on this very page, so refusing to render it would leave the buyer with no
+        // way to supply what is missing. Asking whether the step is reachable is exactly
+        // that distinction — it runs the checks of the steps before this one, never its
+        // own. The rule is enforced on leaving the step instead, by
+        // CheckoutValidationService, and surfaced early by the NextButton.
+        if (!$progression->isReachable($cart, CheckoutStep::CODE_PAYMENT)) {
+            return $this->generateRedirect($routes->pathOfTheFirstIncompleteStep($cart));
+        }
+
+        return $this->render('checkout-payment', [
+            'current' => CheckoutStep::CODE_PAYMENT,
+            'steps' => $trail->of($cart),
+            'next_step_url' => $routes->pathAfter($cart, CheckoutStep::CODE_PAYMENT),
+            'previous_step_url' => $routes->pathBefore($cart, CheckoutStep::CODE_PAYMENT),
+        ]);
+    }
+
+    /**
+     * @throws PropelException
+     */
+    #[Route('/gateway', name: 'gateway')]
+    public function gatewayAction(
+        GuestCheckoutGate $guestCheckoutGate,
+        CheckoutTrail $trail,
+    ): Response {
+        $this->checkCheckoutAccess($guestCheckoutGate);
+
+        return $this->render('checkout-gateway', [
+            // Handing the money over is part of the payment step, not a stop of its own:
+            // the bar stays where the buyer left it.
+            'current' => CheckoutStep::CODE_PAYMENT,
+            'steps' => $trail->ofTheSessionCart(),
+        ]);
+    }
+
+    /**
+     * @throws PropelException
+     */
     #[Route('/pay', name: 'pay')]
     public function payAction(
         CartFacade $cartFacade,
@@ -145,14 +208,26 @@ class CheckoutController extends FlexyController
         CartStockService $cartStockService,
         GuestCheckoutGate $guestCheckoutGate,
         GuestOrderTracking $guestOrderTracking,
+        ShippingFacade $shippingFacade,
+        CheckoutProgressionService $progression,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
     ): Response {
+        $cart = $cartFacade->getCartFromSession();
+
         try {
             $this->checkCheckoutAccess($guestCheckoutGate);
 
-            $cart = $cartFacade->getCartFromSession();
             if (null === $cart) {
                 throw new EmptyCartException();
             }
+
+            // Replayed here and not only on the step that leads to this one: on a
+            // one-page checkout the cart can lose its last shippable line after the
+            // sections above were settled, and the delivery step it was asked about is
+            // gone by the time the order is placed. The carrier the order is refused
+            // without is nobody else's job from here on.
+            $this->settleTheDeliveryOfACartWithNothingToShip($cart, $shippingFacade, $progression);
 
             $checkoutFacade->validateForOrder($cart);
 
@@ -160,7 +235,7 @@ class CheckoutController extends FlexyController
             // order row exists — failing there leaves a dangling order and shows the visitor a raw
             // "REF : Not enough stock 2". Send them back to the cart, which spells out the shortage.
             if ($cartStockService->hasInsufficientStock($cart)) {
-                return $this->generateRedirect($this->generateUrl('checkout_cart'));
+                return $this->generateRedirect($routes->pathFor(CheckoutStep::CODE_CART));
             }
 
             $response = $checkoutFacade->pay(
@@ -180,7 +255,10 @@ class CheckoutController extends FlexyController
             }
 
             return $this->render('checkout-confirm', [
-                'current' => CheckoutSteps::CONFIRM,
+                'current' => CheckoutStep::CODE_CONFIRMATION,
+                // The cart was emptied by the placement a few lines ago: the bar is the
+                // one the order was placed through, not the one an empty cart describes.
+                'steps' => $trail->ofTheOrderJustPlaced(),
                 'guest_order_token' => $guestOrderTracking->tokenOfPlacedOrder(),
             ]);
         } catch (GuestCheckoutNotAllowedException) {
@@ -194,33 +272,35 @@ class CheckoutController extends FlexyController
                 $this->translator->trans('This order can no longer be placed without an account. Please sign in or create one.'),
             );
         } catch (EmptyCartException $e) {
-            throw new RedirectException($this->generateUrl('checkout_cart'), Response::HTTP_FOUND, $e->getMessage());
-        } catch (IncompleteInvoiceAddressException $e) {
-            // Back to the payment step, which is where this theme puts the billing address
-            // form: it opens on the selected address, ready to be completed.
+            throw new RedirectException($routes->pathFor(CheckoutStep::CODE_CART), Response::HTTP_FOUND, $e->getMessage());
+        } catch (MissingAddressException|InvalidDeliveryException|IncompleteInvoiceAddressException|MissingConsentException $e) {
+            // The rule, not the greyed-out button: a request that reaches here without a
+            // carrier, without the legal identifiers of a business invoice or without the
+            // boxes ticked — a typed url, a consent the shop made mandatory while the page
+            // was open — places no order.
+            //
+            // Where it lands is the progression's answer rather than one written per
+            // exception: the step that still has something missing is the step the buyer
+            // has to be on, and on a one-page checkout it is the only screen there is.
+            //
+            // The core redirect listener only reads the url and the status off
+            // RedirectException, dropping its message: a flash is what actually gets the
+            // wording — which names the consent, or the field — onto the page they land on.
+            // A cart there is none of raises EmptyCartException, which the catch above
+            // answers: by here there is one to read the progression off.
             $this->addFlash('error', $e->getMessage());
 
-            throw new RedirectException($this->generateUrl('checkout_payment'), Response::HTTP_FOUND, $e->getMessage());
-        } catch (MissingConsentException $e) {
-            // This is the rule, not the greyed-out button: the boxes live on the payment
-            // step, and a request that reaches here without them ticked — a typed url, a
-            // consent the shop made mandatory while the page was open — places no order.
-            // The message names the consent that is missing, so the step it lands on
-            // shows the buyer what is left to do. The core redirect listener only reads
-            // the url and the status off RedirectException, dropping its message: a flash
-            // is what actually gets the wording onto the page the buyer lands on.
-            $this->addFlash('error', $e->getMessage());
-
-            throw new RedirectException($this->generateUrl('checkout_payment'), Response::HTTP_FOUND, $e->getMessage());
-        } catch (MissingAddressException|InvalidDeliveryException $e) {
-            // Same silent-redirect defect as the consents had: the message only reaches
-            // the delivery step through the flash bag, never through RedirectException.
-            $this->addFlash('error', $e->getMessage());
-
-            throw new RedirectException($this->generateUrl('checkout_delivery'), Response::HTTP_FOUND, $e->getMessage());
+            throw new RedirectException(
+                $routes->pathOfTheFirstIncompleteStep($cart),
+                Response::HTTP_FOUND,
+                $e->getMessage(),
+            );
         }
     }
 
+    /**
+     * @throws PropelException
+     */
     #[Route('/confirm', name: 'confirm')]
     public function confirmAction(
         Session $session,
@@ -228,6 +308,7 @@ class CheckoutController extends FlexyController
         GuestCheckoutGate $guestCheckoutGate,
         GuestOrderTracking $guestOrderTracking,
         PlacedOrderMemory $placedOrderMemory,
+        CheckoutTrail $trail,
     ): Response {
         // The core retires a guest from the session the moment their order exists, so by
         // the time a payment module sends them back here there is no customer left to
@@ -241,6 +322,12 @@ class CheckoutController extends FlexyController
             $this->checkCheckoutAccess($guestCheckoutGate);
         }
 
+        // The tunnel the order was placed through, taken at the placement: this page is
+        // read after the cart was emptied — sometimes several requests later, on the way
+        // back from a payment gateway — and an empty cart describes another tunnel than
+        // the one the buyer walked.
+        $steps = $trail->ofTheOrderJustPlaced();
+
         // Only for a session that actually placed an order. This page is reachable by
         // typing its url, and emptying the cart of someone halfway through the checkout
         // would throw away what they had put in it. The core already empties the cart on
@@ -250,16 +337,21 @@ class CheckoutController extends FlexyController
         }
 
         return $this->render('checkout-confirm', [
-            'current' => CheckoutSteps::CONFIRM,
+            'current' => CheckoutStep::CODE_CONFIRMATION,
+            'steps' => $steps,
             'guest_order_token' => $guestOrderToken,
         ]);
     }
 
+    /**
+     * @throws PropelException
+     */
     #[Route('/failed', name: 'failed')]
     public function failedAction(
         CheckoutFacade $checkoutFacade,
         Request $request,
         GuestOrderTracking $guestOrderTracking,
+        CheckoutTrail $trail,
     ): Response {
         $order = $this->cancelFailedOrder(
             $checkoutFacade,
@@ -268,10 +360,88 @@ class CheckoutController extends FlexyController
         );
 
         return $this->render('checkout-failed', [
-            'current' => CheckoutSteps::FAILED,
+            // A payment that did not go through leaves the buyer on the payment step: it
+            // is what they have to do again.
+            'current' => CheckoutStep::CODE_PAYMENT,
+            // The order exists — it is the one just cancelled — so the cart is gone and
+            // the bar is the tunnel that order was placed through.
+            'steps' => $trail->ofTheOrderJustPlaced(),
             'failed_order_id' => $order?->getId(),
             'failed_order_message' => $request->query->get('message'),
         ]);
+    }
+
+    /**
+     * The whole tunnel on one page, which is what the shop asked for.
+     *
+     * Deliberately without resetCheckout(): on a checkout of several screens the cart
+     * page is the one the buyer walks forward from, and dropping the carrier and the
+     * payment there is how going back undoes a choice. Here that page *is* the delivery
+     * and the payment, so a reset would erase both on every reload and leave the
+     * sections below permanently locked.
+     *
+     * @throws PropelException
+     */
+    private function renderTheWholeTunnel(
+        Cart $cart,
+        CartGuard $cartGuard,
+        ShippingFacade $shippingFacade,
+        CheckoutProgressionService $progression,
+        CheckoutStepRouteResolver $routes,
+        CheckoutTrail $trail,
+        bool $identifiesNext,
+    ): Response {
+        $this->settleTheDeliveryOfACartWithNothingToShip($cart, $shippingFacade, $progression);
+
+        $emptyCart = false;
+
+        try {
+            $cartGuard->checkCartNotEmpty($cart);
+        } catch (EmptyCartException) {
+            $emptyCart = true;
+        }
+
+        $firstIncomplete = $progression->firstIncompleteStep($cart);
+        $payStep = $routes->lastStepToSettle($cart);
+
+        return $this->render('checkout-onepage', [
+            'emptyCart' => $emptyCart,
+            // Where the bar stands is what the buyer still has to do, since every step is
+            // on the screen at once. A cart with nothing left to settle stops at the last
+            // step there is something to do at — never at the confirmation, which is read
+            // once the order exists and would otherwise be announced to a buyer who has
+            // not pressed the button yet.
+            'current' => $firstIncomplete?->code ?? $payStep,
+            'steps' => $trail->of($cart, $identifiesNext),
+            'pay_step' => $payStep,
+            'next_step_url' => $this->generateUrl('checkout_pay'),
+        ]);
+    }
+
+    /**
+     * Gives a cart with nothing to ship the carrier the order cannot be placed without.
+     *
+     * The delivery step is left out of the tunnel of such a cart — there is no question
+     * to ask — and that is exactly why this has to happen somewhere: the order is still
+     * refused without a carrier and an address on the cart, and the screen that used to
+     * set them is the one the buyer no longer sees. Done as they reach the step that
+     * follows the cart, which is the moment the delivery would have been settled.
+     *
+     * @throws PropelException
+     */
+    private function settleTheDeliveryOfACartWithNothingToShip(
+        Cart $cart,
+        ShippingFacade $shippingFacade,
+        CheckoutProgressionService $progression,
+    ): void {
+        if (!$cart->isVirtual()) {
+            return;
+        }
+
+        $shippingFacade->setupVirtualDelivery($cart);
+
+        // The cart now has a carrier it did not have a line ago.
+        $progression->forget();
     }
 
     /**

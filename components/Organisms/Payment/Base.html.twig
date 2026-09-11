@@ -1,7 +1,7 @@
 <div {{ attributes.defaults(stimulus_controller('live-refresh-on-focus')) }} data-loading="addClass(opacity-50 pointer-events-none)">
-    <h1 class="text-black h4">
+    <{{ this.headingLevel }} class="text-black h4">
         {{ 'Choose a payment method'|trans }}
-    </h1>
+    </{{ this.headingLevel }}>
     <ul class="flex flex-col gap-3.5 my-5">
         {% for module in this.modules|filter(m => m.valid) %}
             <li>

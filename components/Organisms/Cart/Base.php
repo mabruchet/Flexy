@@ -42,6 +42,16 @@ class Base
     use ComponentToolsTrait;
     use DefaultActionTrait;
 
+    /**
+     * The tag this step's title is written with.
+     *
+     * A page that stacks the whole tunnel carries three of these organisms at once, and
+     * three h1 tell a screen reader it is looking at three documents: that page hands
+     * over 'h2'. A checkout of one screen per step keeps the h1 it has always had.
+     */
+    #[LiveProp]
+    public string $headingLevel = 'h1';
+
     public ?array $pendingDelete = null;
 
     /** @var CartItemDto[] */

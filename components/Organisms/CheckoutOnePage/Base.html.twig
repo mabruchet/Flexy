@@ -1,0 +1,62 @@
+{# One section per step of the tunnel, in the order the merchant put them in.
+
+   The accordion opens and closes without taking anything out of the DOM, which is what
+   lets the step components inside it stay mounted while the buyer moves between them.
+   A locked section is a different matter: its content is not rendered at all, so there
+   is nothing in the page for the lock to be a decoration of. #}
+<div {{ attributes.defaults({
+    id: 'checkout-onepage',
+    'data-loading': 'addClass(opacity-50 pointer-events-none)',
+    ...stimulus_controller('live-refresh-on-focus'),
+}) }}>
+    {# Read before the accordion opens: inside a component's body `this` is that
+       component, so the sections have to be carried in as plain variables. #}
+    {% set sections = this.sections %}
+    {% set entryPointRoute = this.entryPointRoute %}
+
+    <twig:Molecules:Accordion:Base id="checkout-step" :multiple="true">
+        {% for section in sections %}
+            <twig:Molecules:Accordion:Item
+                :value="section.code"
+                :open="section.unlocked"
+                :disabled="not section.unlocked"
+                id="checkout-step-{{ section.code }}"
+            >
+                <twig:Molecules:Accordion:Trigger class="h4 text-black py-4">
+                    <span class="flex items-center gap-2">
+                        {% if not section.unlocked %}
+                            <span class="inline-flex w-5 h-5 shrink-0 text-grey-dark">{{ ux_icon('lock') }}</span>
+                        {% endif %}
+                        {{ section.title }}
+                    </span>
+                </twig:Molecules:Accordion:Trigger>
+
+                {# Outside the panel on purpose: a disabled trigger cannot be opened, so a
+                   reason written inside it would never be read. #}
+                {% if not section.unlocked %}
+                    <p class="paragraph-4 text-grey-dark px-4 pb-4">
+                        {% if section.needsIdentification %}
+                            {{ 'Tell us who you are to carry on with your order.'|trans }}
+                            <a href="{{ path(entryPointRoute) }}" class="underline underline-offset-3">
+                                {{ 'Continue'|trans }}
+                            </a>
+                        {% else %}
+                            {{ 'Finish the step above to open this one.'|trans }}
+                        {% endif %}
+                    </p>
+                {% endif %}
+
+                <twig:Molecules:Accordion:Content class="px-4 pb-8">
+                    {% if section.unlocked and section.componentName %}
+                        {# The section already names the step above its own content, so the
+                           step component writes its title one level down: three organisms
+                           each carrying an h1 would announce three documents on one page.
+                           A component that does not know the prop takes it as an attribute
+                           and renders as it always did. #}
+                        {{ component(section.componentName, {key: section.code, headingLevel: 'h2'}) }}
+                    {% endif %}
+                </twig:Molecules:Accordion:Content>
+            </twig:Molecules:Accordion:Item>
+        {% endfor %}
+    </twig:Molecules:Accordion:Base>
+</div>

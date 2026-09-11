@@ -16,11 +16,15 @@ namespace FlexyBundle\EventListener;
 
 use FlexyBundle\Service\GuestOrderTracking;
 use FlexyBundle\Service\PlacedOrderMemory;
+use Propel\Runtime\Exception\PropelException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Thelia\Core\Event\Order\OrderEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Core\HttpFoundation\Session\Session;
+use Thelia\Domain\Cart\CartFacade;
+use Thelia\Domain\Checkout\DTO\CheckoutStepView;
+use Thelia\Domain\Checkout\Service\CheckoutProgressionService;
 use Thelia\Model\Order;
 
 /**
@@ -34,6 +38,9 @@ use Thelia\Model\Order;
  * It is dropped again the moment the session changes hands. A browser is not one person:
  * whoever signs out leaves it to whoever comes next, and a token left behind would show
  * them somebody else's order on the confirmation page.
+ *
+ * The same moment is the last one at which the tunnel that order was placed through can
+ * be read, which is why the steps are taken here too.
  */
 final readonly class GuestOrderPlacedSubscriber implements EventSubscriberInterface
 {
@@ -46,6 +53,8 @@ final readonly class GuestOrderPlacedSubscriber implements EventSubscriberInterf
         private GuestOrderTracking $guestOrderTracking,
         private PlacedOrderMemory $placedOrderMemory,
         private RequestStack $requestStack,
+        private CartFacade $cartFacade,
+        private CheckoutProgressionService $progression,
     ) {
     }
 
@@ -68,6 +77,7 @@ final readonly class GuestOrderPlacedSubscriber implements EventSubscriberInterf
         // Remembered for every buyer, account or not: it is what tells the confirmation
         // page apart from someone who merely typed its url with a full cart.
         $this->placedOrderMemory->remember($order);
+        $this->placedOrderMemory->rememberTheStepsWalked($this->stepsThisOrderWasPlacedThrough());
 
         if (!$session->isCustomerGuest()) {
             return;
@@ -88,6 +98,36 @@ final readonly class GuestOrderPlacedSubscriber implements EventSubscriberInterf
             TheliaEvents::ORDER_CART_CLEAR => ['rememberGuestOrder', self::PRIORITY_BEFORE_THE_GUEST_IS_CLEARED],
             TheliaEvents::CUSTOMER_LOGOUT => ['forgetGuestOrder', self::PRIORITY_BEFORE_THE_GUEST_IS_CLEARED],
         ];
+    }
+
+    /**
+     * The tunnel this order went through, read while there is still a cart to read it
+     * off: the very event this listens to is what replaces it with an empty one, and an
+     * empty cart answers differently — it is not virtual, so the delivery step it was
+     * never shown would come back on the confirmation page.
+     *
+     * A checkout that cannot even be described is no reason to fail a placement that has
+     * already gone through, so anything the read throws leaves the memory empty and the
+     * pages after it fall back to the cart in session.
+     *
+     * @return list<string>
+     */
+    private function stepsThisOrderWasPlacedThrough(): array
+    {
+        try {
+            $cart = $this->cartFacade->getCartFromSession();
+
+            if (null === $cart) {
+                return [];
+            }
+
+            return array_map(
+                static fn (CheckoutStepView $step): string => $step->code,
+                $this->progression->activeSteps($cart),
+            );
+        } catch (PropelException) {
+            return [];
+        }
     }
 
     private function session(): ?Session
