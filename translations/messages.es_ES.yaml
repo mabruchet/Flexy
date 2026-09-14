@@ -1,6 +1,7 @@
 # The theme ships full catalogs for en_US and fr_FR only. This file carries the
-# strings of the commercial operation page and its countdown, so the feature
-# reads correctly in every language the demo shop activates.
+# strings of the commercial operation page and its countdown, and the heading a
+# shop's message to its customer is filed under, so those features read correctly
+# in every language the demo shop activates.
 Products in this operation: Los productos de esta operación
 Sale: Venta
 Time left before this offer ends: Tiempo restante antes del fin de esta oferta
@@ -30,3 +31,4 @@ No gift wrapping: Sin envoltorio de regalo
 Message for the recipient: Mensaje para el destinatario
 gift_message_characters_left: '%count% caracteres restantes'
 The message must be %max characters at most.: El mensaje debe tener %max caracteres como máximo.
+Messages from the shop: Mensajes de la tienda

@@ -509,3 +509,4 @@ VAT exempted (reverse charge), buyer VAT number %number%: 'Exonération de TVA (
 'The verification of VAT number %number% has expired: the order is no longer exempted from VAT.': 'La vérification du numéro de TVA %number% a expiré : la commande n''est plus exonérée de TVA.'
 'VAT number %number% is not verified: the order is not exempted from VAT.': 'Le numéro de TVA %number% n''est pas vérifié : la commande n''est pas exonérée de TVA.'
 "The stock of %reference% ran out while your order was placed. Please adjust your cart.": "Le stock de %reference% s'est épuisé pendant la validation de votre commande. Veuillez ajuster votre panier."
+Messages from the shop: Messages de la boutique
