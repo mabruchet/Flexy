@@ -42,6 +42,13 @@
                             <a href="{{ path(entryPointRoute) }}" class="underline underline-offset-3">
                                 {{ 'Continue'|trans }}
                             </a>
+                        {% elseif section.needsAnAccount %}
+                            {# The same refusal the several-screen checkout answers with, and its
+                               one way out: signing in, then coming back to this page. #}
+                            {{ 'One of the products in your cart requires an account. Please sign in or create one to place this order.'|trans }}
+                            <a href="{{ path('customer_login', {redirect: path('checkout_cart')}) }}" class="underline underline-offset-3">
+                                {{ 'Log in'|trans }}
+                            </a>
                         {% else %}
                             {{ 'Finish the step above to open this one.'|trans }}
                         {% endif %}

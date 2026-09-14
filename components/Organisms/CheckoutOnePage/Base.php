@@ -65,7 +65,7 @@ class Base
         CheckoutStep::CODE_PAYMENT => 'Organisms:Payment:Base',
     ];
 
-    /** @var list<array{code: string, title: string, componentName: string|null, unlocked: bool, needsIdentification: bool}>|null */
+    /** @var list<array{code: string, title: string, componentName: string|null, unlocked: bool, needsIdentification: bool, needsAnAccount: bool}>|null */
     private ?array $sections = null;
 
     public function __construct(
@@ -103,7 +103,7 @@ class Base
      * The sections to lay out: every step of the tunnel except the confirmation, which
      * is read once the order exists and has a page of its own.
      *
-     * @return list<array{code: string, title: string, componentName: string|null, unlocked: bool, needsIdentification: bool}>
+     * @return list<array{code: string, title: string, componentName: string|null, unlocked: bool, needsIdentification: bool, needsAnAccount: bool}>
      *
      * @throws PropelException
      */
@@ -115,6 +115,10 @@ class Base
 
         $cart = $this->cartFacade->getOrCreateFromSession();
         $mayEnterTheCheckout = $this->guestCheckoutGate->mayEnterCheckout();
+        // Asked on every render and not only on the way in, as the several-screen
+        // checkout asks it on every step: a guest already in the tunnel may add a
+        // product the shop only sells to account holders, and the cart is what decides.
+        $refusedAsAGuest = $this->guestCheckoutGate->isCheckingOutAsAGuest() && $this->guestCheckoutGate->isRefusedByTheCart();
         $sections = [];
 
         foreach ($this->progression->activeSteps($cart, $this->langService->getLocale()) as $step) {
@@ -134,13 +138,17 @@ class Base
             $needsIdentification = $reachable
                 && CheckoutStep::CODE_CART !== $step->code
                 && !$mayEnterTheCheckout;
+            $needsAnAccount = $reachable
+                && CheckoutStep::CODE_CART !== $step->code
+                && $refusedAsAGuest;
 
             $sections[] = [
                 'code' => $step->code,
                 'title' => $step->title,
                 'componentName' => self::COMPONENTS[$step->code] ?? $step->componentName,
-                'unlocked' => $reachable && !$needsIdentification,
+                'unlocked' => $reachable && !$needsIdentification && !$needsAnAccount,
                 'needsIdentification' => $needsIdentification,
+                'needsAnAccount' => $needsAnAccount,
             ];
         }
 
