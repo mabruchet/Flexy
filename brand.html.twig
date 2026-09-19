@@ -44,10 +44,10 @@
 
     {{ theme_hook('brand.top', {brand: brand}) }}
 
-    {# container 'large': Thelia defines its product filters per category, so a brand listing has
-       no sidebar to align with, and the page takes the geometry of the all-products one. The
-       trigger stays: below lg it is the only way to reach the sort, and hasFilters false makes it
-       say so instead of offering to filter. #}
+    {# container 'large': a brand listing has no category sidebar to align with, so the page takes
+       the geometry of the all-products one. hasFilters is left to its default, like the category
+       page: a brand page now offers the facets of the categories its products are filed in, so the
+       trigger below lg reaches the filters and not only the sort. #}
     <twig:Layouts:Subheader:Category
         title="{{ SEOnePageH1()|default(null) ?: brandTitle }}"
         description="{{ chapo }}"
@@ -56,7 +56,6 @@
         :breadcrumb="breadcrumb"
         container="large"
         filtersId="product-listing"
-        :hasFilters="false"
         :productCount="loopCount('product', {brand: brandId, visible: 1})"
     />
 
