@@ -30,10 +30,11 @@ use Thelia\Model\Order;
 /**
  * Keeps the way back to an order placed without an account, and lets it go again.
  *
- * The core retires the guest from the session on ORDER_CART_CLEAR, so the confirmation
- * page that follows has no customer left to read. The tracking token is taken here,
- * while the session still says who placed the order, and kept for that page alone: it
- * opens one order, which is the same thing the buyer receives by email.
+ * The confirmation page that follows a placement may have no customer left to read: the
+ * core retires the guest from the session once the cart the order was paid for is
+ * consumed. The tracking token is taken at placement, while the session still says who
+ * placed the order, and kept for that page alone: it opens one order, which is the same
+ * thing the buyer receives by email.
  *
  * It is dropped again the moment the session changes hands. A browser is not one person:
  * whoever signs out leaves it to whoever comes next, and a token left behind would show
@@ -45,9 +46,9 @@ use Thelia\Model\Order;
 final readonly class GuestOrderPlacedSubscriber implements EventSubscriberInterface
 {
     /**
-     * Above the core listener that clears the guest, which sits at 128.
+     * Above the core listener of the same event, which sits at 128.
      */
-    private const PRIORITY_BEFORE_THE_GUEST_IS_CLEARED = 256;
+    private const PRIORITY_AT_PLACEMENT = 256;
 
     public function __construct(
         private GuestOrderTracking $guestOrderTracking,
@@ -95,8 +96,12 @@ final readonly class GuestOrderPlacedSubscriber implements EventSubscriberInterf
     public static function getSubscribedEvents(): array
     {
         return [
-            TheliaEvents::ORDER_CART_CLEAR => ['rememberGuestOrder', self::PRIORITY_BEFORE_THE_GUEST_IS_CLEARED],
-            TheliaEvents::CUSTOMER_LOGOUT => ['forgetGuestOrder', self::PRIORITY_BEFORE_THE_GUEST_IS_CLEARED],
+            // The placement itself, not the cart clearing: the core no longer empties the
+            // cart when an order is placed, it waits for the payment to be confirmed, so
+            // ORDER_CART_CLEAR is not raised here any more. ORDER_BEFORE_PAYMENT is raised
+            // at the same point of Thelia\Action\Order::create(), with the same event.
+            TheliaEvents::ORDER_BEFORE_PAYMENT => ['rememberGuestOrder', self::PRIORITY_AT_PLACEMENT],
+            TheliaEvents::CUSTOMER_LOGOUT => ['forgetGuestOrder', self::PRIORITY_AT_PLACEMENT],
         ];
     }
 
