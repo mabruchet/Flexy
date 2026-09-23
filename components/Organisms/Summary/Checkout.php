@@ -53,6 +53,7 @@ class Checkout
             'taxed_gift_wrapping' => $this->attributeAccessService->attributeCart('taxed_gift_wrapping'),
             'discounts' => $this->readDiscounts(),
             'coupons' => $this->attributeAccessService->attributeCoupon('coupon_list'),
+            'invoice_vat_number' => $this->attributeAccessService->attributeCart('invoice_vat_number'),
         ];
     }
 
@@ -138,6 +139,11 @@ class Checkout
         $taxAmount = $this->attributeAccessService->attributeCart('total_tax_amount');
 
         return $taxAmount !== null && $taxAmount > 0;
+    }
+
+    public function isVatExempted(): bool
+    {
+        return (bool) $this->attributeAccessService->attributeCart('is_vat_exempted');
     }
 
     public function hasDiscount(): bool

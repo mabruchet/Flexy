@@ -502,3 +502,7 @@ No gift wrapping: Pas d'emballage cadeau
 Message for the recipient: Message pour le destinataire
 gift_message_characters_left: '%count% caractères restants'
 The message must be %max characters at most.: Le message doit faire %max caractères au maximum.
+
+# VAT exemption (Summary/Checkout, Summary/Order, AddressCard)
+VAT verified on %date%: TVA vérifiée le %date%
+VAT exempted (reverse charge), buyer VAT number %number%: 'Exonération de TVA (autoliquidation), numéro de TVA de l''acheteur : %number%'

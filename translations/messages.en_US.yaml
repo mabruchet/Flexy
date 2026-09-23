@@ -493,3 +493,7 @@ No gift wrapping: No gift wrapping
 Message for the recipient: Message for the recipient
 gift_message_characters_left: '%count% characters left'
 The message must be %max characters at most.: The message must be %max characters at most.
+
+# VAT exemption (Summary/Checkout, Summary/Order, AddressCard)
+VAT verified on %date%: VAT verified on %date%
+VAT exempted (reverse charge), buyer VAT number %number%: VAT exempted (reverse charge), buyer VAT number %number%
