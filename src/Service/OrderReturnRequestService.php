@@ -16,15 +16,13 @@ namespace FlexyBundle\Service;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
 use Propel\Runtime\Connection\ConnectionInterface;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Resource\Order as OrderResource;
 use Thelia\Api\Resource\OrderProduct as OrderProductResource;
 use Thelia\Api\Resource\OrderReturn as OrderReturnResource;
 use Thelia\Api\Resource\OrderReturnLine as OrderReturnLineResource;
 use Thelia\Api\Resource\OrderReturnReason as OrderReturnReasonResource;
 use Thelia\Api\Service\OrderReturnHydrator;
-use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
-use Thelia\Core\Event\TheliaEvents;
+use Thelia\Api\Service\OrderReturnStatusEmailDispatcher;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
 use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransactionInterface;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
@@ -57,7 +55,7 @@ final readonly class OrderReturnRequestService
     public function __construct(
         private ReturnEligibilityChecker $eligibility,
         private OrderReturnHydrator $hydrator,
-        private EventDispatcherInterface $eventDispatcher,
+        private OrderReturnStatusEmailDispatcher $statusEmailDispatcher,
         private ReturnRequestLimiter $limiter,
         private OrderReturnWriteTransactionInterface $transaction,
     ) {
@@ -136,8 +134,10 @@ final readonly class OrderReturnRequestService
         );
 
         // Announced once the return is committed, never from inside the transaction:
-        // a mail is not something a rollback takes back.
-        $this->eventDispatcher->dispatch(new OrderReturnEvent($model), TheliaEvents::ORDER_RETURN_SEND_STATUS_EMAIL);
+        // a mail is not something a rollback takes back. Reuses the exact dispatch
+        // every create processor of the return API already shares, wrapping the
+        // written model back into a resource only to satisfy its signature.
+        $this->statusEmailDispatcher->dispatch((new OrderReturnResource())->setPropelModel($model));
 
         return $model;
     }
