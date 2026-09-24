@@ -22,24 +22,36 @@
         {{ ...stimulus_action(headerProfileController, 'toggle', 'click')|stimulus_action(mobileDrawerController, 'toggle', 'click') }}
     />
 
-    <ul class="HeaderProfile-dropdown" id="HeaderProfile-dropdown">
-        {% for item in accountItems %}
+    <nav aria-label="{{ 'My account'|trans }}">
+        <ul class="HeaderProfile-dropdown" id="HeaderProfile-dropdown">
+            {% for item in accountItems %}
+                <li class="HeaderProfile-item">
+                    <twig:Molecules:MenuItem:Base
+                        href="{{ item.href }}"
+                        text="{{ item.text }}"
+                        {{ ...(item.href == this.currentPath ? {'aria-current': 'page'} : {}) }}
+                    />
+                </li>
+            {% endfor %}
             <li class="HeaderProfile-item">
-                <twig:Molecules:MenuItem:Base href="{{ item.href }}" text="{{ item.text }}" />
+                <twig:Molecules:MenuItem:Base href="{{ path('customer_logout') }}" text="{{ 'Logout'|trans }}" :icon="true" />
             </li>
-        {% endfor %}
-        <li class="HeaderProfile-item">
-            <twig:Molecules:MenuItem:Base href="{{ path('customer_logout') }}" text="{{ 'Logout'|trans }}" :icon="true" />
-        </li>
-    </ul>
+        </ul>
+    </nav>
 
     <twig:Molecules:MobileDrawer:Base class="md:hidden">
         <strong class="HeaderProfile-greeting">
             {{ 'hy_customer'|trans({'%firstname%': customer.firstname}) }}
         </strong>
-        {% for item in accountItems %}
-            <twig:Molecules:MenuItem:Base href="{{ item.href }}" text="{{ item.text }}" />
-        {% endfor %}
-        <twig:Molecules:MenuItem:Base href="{{ path('customer_logout') }}" text="{{ 'Logout'|trans }}" :icon="true" />
+        <nav aria-label="{{ 'My account'|trans }}">
+            {% for item in accountItems %}
+                <twig:Molecules:MenuItem:Base
+                    href="{{ item.href }}"
+                    text="{{ item.text }}"
+                    {{ ...(item.href == this.currentPath ? {'aria-current': 'page'} : {}) }}
+                />
+            {% endfor %}
+            <twig:Molecules:MenuItem:Base href="{{ path('customer_logout') }}" text="{{ 'Logout'|trans }}" :icon="true" />
+        </nav>
     </twig:Molecules:MobileDrawer:Base>
 </div>
