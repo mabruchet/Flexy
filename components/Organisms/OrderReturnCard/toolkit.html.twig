@@ -1,0 +1,28 @@
+{# Static returns shaped like the account collection: the card links to real routes, so the
+   ids only need to be numbers. #}
+<div class="Story">
+    <div class="Story-section">
+        <h4 class="Story-title">In the list of one order</h4>
+        <ul class="flex flex-col gap-2 list-none p-0 m-0">
+            <twig:Organisms:OrderReturnCard:Base :orderReturn="{
+                id: 1,
+                ref: 'RET000000000001',
+                createdAt: '2026-09-12',
+                orderReturnStatus: {code: 'requested', i18ns: {title: 'Requested'}},
+            }" />
+        </ul>
+    </div>
+    <div class="Story-section">
+        <h4 class="Story-title">In the list of every return, with its order</h4>
+        <ul class="flex flex-col gap-2 list-none p-0 m-0">
+            <twig:Organisms:OrderReturnCard:Base :withOrder="true" :orderReturn="{
+                id: 2,
+                ref: 'RET000000000002',
+                createdAt: '2026-09-02',
+                orderId: 1,
+                orderRef: 'ORD000000000001',
+                orderReturnStatus: {code: 'settled', i18ns: {title: 'Settled'}},
+            }" />
+        </ul>
+    </div>
+</div>

@@ -61,6 +61,9 @@ final class ComponentStatus
             // its file without extension (`Toolkit/welcome`).
             'Toolkit/welcome' => self::READY,
 
+            // Components the theme itself has closed:
+            'Organisms/OrderReturnCard' => self::READY,
+
             default => null,
         };
     }

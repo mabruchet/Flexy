@@ -1,26 +1,13 @@
 {# The block reads the signed-in customer's own returns, so it has nothing to show in the
-   toolkit: what is worth looking at here is the pill the list is built around, and the
-   two states the block can be in. Both are rendered from static markup. #}
+   toolkit: what is worth looking at here is the list it draws, from static returns. #}
 <div class="Story">
     <div class="Story-section">
         <h4 class="Story-title">Returns of an order</h4>
         <div class="flex flex-col gap-4">
             <h2 class="h4">Returns</h2>
             <ul class="flex flex-col gap-2 list-none p-0 m-0">
-                <li class="flex flex-wrap items-center justify-between gap-3 border border-grey-lighter rounded-lg p-4">
-                    <div class="flex flex-col gap-1">
-                        <twig:Molecules:Link:Base href="#" customText="Return RET000000000001" />
-                        <span class="paragraph-3">12 September 2026</span>
-                    </div>
-                    <twig:Molecules:Tag:OrderReturn status="requested" customText="Requested" />
-                </li>
-                <li class="flex flex-wrap items-center justify-between gap-3 border border-grey-lighter rounded-lg p-4">
-                    <div class="flex flex-col gap-1">
-                        <twig:Molecules:Link:Base href="#" customText="Return RET000000000002" />
-                        <span class="paragraph-3">2 September 2026</span>
-                    </div>
-                    <twig:Molecules:Tag:OrderReturn status="settled" customText="Settled" />
-                </li>
+                <twig:Organisms:OrderReturnCard:Base :orderReturn="{id: 1, ref: 'RET000000000001', createdAt: '2026-09-12', orderReturnStatus: {code: 'requested', i18ns: {title: 'Requested'}}}" />
+                <twig:Organisms:OrderReturnCard:Base :orderReturn="{id: 2, ref: 'RET000000000002', createdAt: '2026-09-02', orderReturnStatus: {code: 'settled', i18ns: {title: 'Settled'}}}" />
             </ul>
             <twig:Molecules:Button:Base text="Request a return" href="#" class="w-max" />
         </div>
