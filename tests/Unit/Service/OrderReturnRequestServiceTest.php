@@ -18,9 +18,13 @@ use FlexyBundle\Service\OrderReturnRequestService;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Propel\Runtime\Connection\ConnectionInterface;
-use Propel\Runtime\Exception\PropelException;
+use Propel\Runtime\Exception\ExceptionInterface as PropelExceptionInterface;
+use Propel\Runtime\Propel;
+use Propel\Runtime\ServiceContainer\ServiceContainerInterface;
+use Propel\Runtime\ServiceContainer\StandardServiceContainer;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Service\OrderReturnHydrator;
+use Thelia\Api\Service\OrderReturnStatusEmailDispatcher;
 use Thelia\Domain\OrderReturn\Service\OrderReturnComposer;
 use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransactionInterface;
 use Thelia\Domain\OrderReturn\Service\RefundAmountCalculator;
@@ -36,12 +40,23 @@ use Thelia\Model\Order;
  *
  * The eligibility checker and the hydrator are the core's own final classes, wired here for
  * real rather than doubled: PHPUnit refuses to double a final class, and their first Propel
- * read - a plain database-map lookup, no connection ever opened - fails deterministically in
- * this suite, which runs on the autoloader alone and never boots the kernel. That failure is
- * used as the probe: whether it happens before or after the write transaction is entered is
- * exactly what tells the two calls apart, so the assertions below read it rather than work
- * around it. What it cannot show is the persist step that would follow a successful read -
- * that half of the ordering is checked by inspection, not by this suite (see the class-level
+ * read - a plain database-map lookup, no connection ever opened - is used as the probe: whether
+ * it fails before or after the write transaction is entered is exactly what tells the two calls
+ * apart. That read only fails deterministically against a database map Propel considers
+ * uninitialized (`Propel::getServiceContainer()->getDatabaseMap()` throws as long as nothing has
+ * populated it yet), which is process state, not something this suite controls by itself: a
+ * component test run first in the same process, a future Unit test that boots the kernel, or a
+ * random test order would each leave the shared service container in a different state, and one
+ * of those states drops the read straight through to a live connection attempt instead - a
+ * different Propel exception, or (with a reachable database) no exception at all. setUp()
+ * installs a brand new `StandardServiceContainer` before every test method, and tearDown() puts
+ * the previous one back, so the probe always starts from the same uninitialized map regardless of
+ * what ran before it in the process. The two exception classes Propel actually throws along this
+ * path - `PropelException` for the uninitialized map and the plain `RuntimeException` for a
+ * database map that exists but names no connection - share no common ancestor other than
+ * `Propel\Runtime\Exception\ExceptionInterface`, so that is what is caught, not either concrete
+ * class. What this cannot show is the persist step that would follow a successful read - that
+ * half of the ordering is checked by inspection, not by this suite (see the class-level
  *
  * @see below).
  * @see OrderReturnRequestService::open() the hydrate() call and the persist() call that
@@ -51,6 +66,23 @@ use Thelia\Model\Order;
 #[CoversClass(OrderReturnRequestService::class)]
 final class OrderReturnRequestServiceTest extends TestCase
 {
+    private ServiceContainerInterface $previousServiceContainer;
+
+    protected function setUp(): void
+    {
+        // A fresh container's database maps start uninitialized, so the probe in
+        // testHydrationHappensAfterTheWriteTransactionIsEntered() fails the same way no matter
+        // what an earlier test - in this class, in this suite, or in a future one sharing the
+        // process - already did to Propel's static, process-wide service container.
+        $this->previousServiceContainer = Propel::getServiceContainer();
+        Propel::setServiceContainer(new StandardServiceContainer());
+    }
+
+    protected function tearDown(): void
+    {
+        Propel::setServiceContainer($this->previousServiceContainer);
+    }
+
     public function testTheWriteTransactionReceivesTheOrderAndOnlyTheRetainedLines(): void
     {
         $transaction = new RecordingWriteTransaction($this->createStub(ConnectionInterface::class));
@@ -80,7 +112,7 @@ final class OrderReturnRequestServiceTest extends TestCase
         try {
             $this->service($transaction)->open($this->order(42), $this->customer(7), [101 => 1.0], null, 'refund', null);
             self::fail('The real hydrator was expected to fail outside a booted kernel.');
-        } catch (PropelException $exception) {
+        } catch (PropelExceptionInterface $exception) {
             self::assertTrue(
                 $transaction->enteredRun,
                 'The read failed before the write transaction was entered: hydrate() runs outside the callback.',
@@ -120,7 +152,7 @@ final class OrderReturnRequestServiceTest extends TestCase
         return new OrderReturnRequestService(
             $eligibility,
             $hydrator,
-            $this->createStub(EventDispatcherInterface::class),
+            new OrderReturnStatusEmailDispatcher($this->createStub(EventDispatcherInterface::class)),
             $limiter,
             $transaction,
         );
