@@ -16,7 +16,6 @@ namespace FlexyBundle\Service;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
 use Propel\Runtime\Connection\ConnectionInterface;
-use Propel\Runtime\Propel;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Resource\Order as OrderResource;
 use Thelia\Api\Resource\OrderProduct as OrderProductResource;
@@ -24,10 +23,10 @@ use Thelia\Api\Resource\OrderReturn as OrderReturnResource;
 use Thelia\Api\Resource\OrderReturnLine as OrderReturnLineResource;
 use Thelia\Api\Resource\OrderReturnReason as OrderReturnReasonResource;
 use Thelia\Api\Service\OrderReturnHydrator;
-use Thelia\Config\DatabaseConfiguration;
 use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
+use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransaction;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
 use Thelia\Model\Customer;
@@ -60,6 +59,7 @@ final readonly class OrderReturnRequestService
         private OrderReturnHydrator $hydrator,
         private EventDispatcherInterface $eventDispatcher,
         private ReturnRequestLimiter $limiter,
+        private OrderReturnWriteTransaction $transaction,
     ) {
     }
 
@@ -119,20 +119,21 @@ final readonly class OrderReturnRequestService
 
         // Reading how much of a line is still returnable and writing the return that
         // consumes it are one step, or two requests arriving together are both allowed
-        // the same last unit. The hydrator locks each order product row it reads, and a
-        // lock outside a transaction is released as soon as it is taken.
-        $connection = Propel::getWriteConnection(DatabaseConfiguration::THELIA_CONNECTION_NAME);
-        $connection->beginTransaction();
+        // the same last unit. The core's write transaction is the one every return path
+        // shares: it locks the order, then the requested lines by increasing id, before
+        // anything is read, so the reads that follow see every return committed on them.
+        // It rolls back and rethrows whatever the work throws, so a refused line still
+        // reaches the controller as a ReturnNotAllowedException; a lock conflict comes
+        // back as ReturnRequestConflictException, one of those too.
+        $model = $this->transaction->run(
+            (int) $order->getId(),
+            array_map('intval', array_keys($requestedLines)),
+            function (ConnectionInterface $connection) use ($resource, $order, $customer): OrderReturnModel {
+                $this->hydrator->hydrate($resource, $customer, false);
 
-        try {
-            $this->hydrator->hydrate($resource, $customer, false);
-            $model = $this->persist($resource, $order, $customer, $connection);
-            $connection->commit();
-        } catch (\Throwable $exception) {
-            $connection->rollBack();
-
-            throw $exception;
-        }
+                return $this->persist($resource, $order, $customer, $connection);
+            },
+        );
 
         // Announced once the return is committed, never from inside the transaction:
         // a mail is not something a rollback takes back.
