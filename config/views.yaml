@@ -18,6 +18,9 @@ internal:
     - account
     - account-order
     - account-orders
+    - account-order-return
+    - account-return
+    - account-returns
     - account-addresses
     - address
     - address-update

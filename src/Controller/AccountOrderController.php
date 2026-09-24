@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace FlexyBundle\Controller;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
+use FlexyBundle\Service\CollectionPaginator;
 use FlexyBundle\Service\OrderReturnRequestService;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -49,6 +50,8 @@ class AccountOrderController extends FlexyController
      * The name of the return document in the active PDF template.
      */
     private const RETURN_DOCUMENT = 'order_return';
+
+    private const RETURNS_PER_PAGE = 10;
 
     /**
      * A return document is only worth printing once the merchant has agreed to take the
@@ -196,6 +199,33 @@ class AccountOrderController extends FlexyController
             'returnId' => $return->getId(),
             'created' => 1,
         ]));
+    }
+
+    /**
+     * Every return of the customer, newest first.
+     */
+    #[Route('/returns', name: 'returns', methods: ['GET'])]
+    public function orderReturns(
+        ReturnEligibilityChecker $eligibility,
+        CollectionPaginator $paginator,
+        Request $request,
+    ): Response {
+        $this->assertReturnsEnabled($eligibility);
+        $this->checkAuth();
+
+        // The customer filter is the barrier here, not a second one. Read in-process, the
+        // collection never meets the core's customer extension: the front session carries no
+        // security token, and the current request is this page, not an /api/front/account
+        // route the access map would tie to ROLE_CUSTOMER.
+        $orderReturns = $paginator->page('/api/front/account/order_returns', [
+            'customer.id' => (int) $this->getSecurityContext()->getCustomerUser()?->getId(),
+            'order[createdAt]' => 'desc',
+        ], CollectionPaginator::requestedPage($request), self::RETURNS_PER_PAGE);
+
+        return $this->render('account-returns', [
+            'orderReturns' => $orderReturns->members,
+            'pagination' => $orderReturns->pagination(),
+        ]);
     }
 
     /**
