@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Components\Layouts\Subheader;
 
+use FlexyBundle\AccountMenu\AccountMenuItem;
 use FlexyBundle\Service\AccountMenuService;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 
@@ -26,7 +27,7 @@ class Account
     }
 
     /**
-     * @return array<int, array{slug: string, text: string, href: string}>
+     * @return list<AccountMenuItem>
      */
     public function getItems(): array
     {
