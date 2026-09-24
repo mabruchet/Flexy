@@ -26,7 +26,7 @@ use Thelia\Api\Service\OrderReturnHydrator;
 use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
-use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransaction;
+use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransactionInterface;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
 use Thelia\Model\Customer;
@@ -59,7 +59,7 @@ final readonly class OrderReturnRequestService
         private OrderReturnHydrator $hydrator,
         private EventDispatcherInterface $eventDispatcher,
         private ReturnRequestLimiter $limiter,
-        private OrderReturnWriteTransaction $transaction,
+        private OrderReturnWriteTransactionInterface $transaction,
     ) {
     }
 
