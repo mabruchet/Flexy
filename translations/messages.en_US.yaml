@@ -460,6 +460,10 @@ Too many return requests, please try again later.: Too many return requests, ple
 The return could not be opened.: The return could not be opened.
 The product returns feature is disabled.: The product returns feature is disabled.
 This order cannot be used for a return.: This order cannot be used for a return.
+This order has been cancelled and can no longer be returned.: This order has been cancelled and can no longer be returned.
+This order has already been refunded and can no longer be returned.: This order has already been refunded and can no longer be returned.
+This order has not been paid yet and cannot be returned.: This order has not been paid yet and cannot be returned.
+Another request is being processed on this order, please try again.: Another request is being processed on this order, please try again.
 The return window for this order has closed.: The return window for this order has closed.
 A virtual product cannot be returned.: A virtual product cannot be returned.
 The returned quantity must be positive.: The returned quantity must be positive.

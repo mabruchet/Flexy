@@ -460,6 +460,10 @@ Too many return requests, please try again later.: Trop de demandes de retour, m
 The return could not be opened.: La demande de retour n'a pas pu être ouverte.
 The product returns feature is disabled.: Les retours produits ne sont pas proposés par cette boutique.
 This order cannot be used for a return.: Cette commande ne peut pas faire l'objet d'un retour.
+This order has been cancelled and can no longer be returned.: Cette commande a été annulée et ne peut plus faire l'objet d'un retour.
+This order has already been refunded and can no longer be returned.: Cette commande a déjà été remboursée et ne peut plus faire l'objet d'un retour.
+This order has not been paid yet and cannot be returned.: Cette commande n'a pas encore été payée et ne peut pas faire l'objet d'un retour.
+Another request is being processed on this order, please try again.: Une autre demande est en cours sur cette commande, merci de réessayer.
 The return window for this order has closed.: Le délai de retour de cette commande est écoulé.
 A virtual product cannot be returned.: Un produit dématérialisé ne peut pas être retourné.
 The returned quantity must be positive.: La quantité à retourner doit être supérieure à zéro.
