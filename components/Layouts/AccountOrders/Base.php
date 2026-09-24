@@ -14,8 +14,9 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Components\Layouts\AccountOrders;
 
+use FlexyBundle\Service\CollectionPaginator;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
-use Thelia\Api\Service\DataAccess\DataAccessService;
 use Thelia\Domain\Customer\CustomerFacade;
 
 /**
@@ -27,19 +28,24 @@ class Base
 {
     public const ITEMS_PER_PAGE = 6;
 
-    /** @var array<int, array<string, mixed>> */
+    /** @var list<array<string, mixed>> */
     public array $orders = [];
 
     /** @var array<string, int> */
     public array $pagination = ['totalItems' => 0, 'itemsPerPage' => self::ITEMS_PER_PAGE, 'currentPage' => 1];
 
     public function __construct(
-        private readonly DataAccessService $dataAccessService,
+        private readonly CollectionPaginator $paginator,
         private readonly CustomerFacade $customerFacade,
+        private readonly RequestStack $requestStack,
     ) {
     }
 
-    public function mount(int $page = 1): void
+    /**
+     * Without a page given, the one of the query string, read raw: CollectionPaginator
+     * makes sense of whatever it holds.
+     */
+    public function mount(mixed $page = null): void
     {
         $customer = $this->customerFacade->getCurrentCustomer();
 
@@ -47,38 +53,15 @@ class Base
             return;
         }
 
-        $page = max(1, $page);
-        $response = $this->fetchPage($customer->getId(), $page);
-        $totalItems = (int) ($response['hydra:totalItems'] ?? 0);
-        $lastPage = max(1, (int) ceil($totalItems / self::ITEMS_PER_PAGE));
-
-        // Out of range the API serves the last page anyway; realigning the page number
-        // keeps the pager honest instead of offering a "next" that leads nowhere.
-        if ($page > $lastPage) {
-            $page = $lastPage;
-            $response = $this->fetchPage($customer->getId(), $page);
-        }
-
-        $this->orders = $response['hydra:member'] ?? [];
-        $this->pagination = [
-            'totalItems' => $totalItems,
-            'itemsPerPage' => self::ITEMS_PER_PAGE,
-            'currentPage' => $page,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fetchPage(int $customerId, int $page): array
-    {
-        $response = $this->dataAccessService->resources('/api/front/account/orders', [
-            'customer.id' => $customerId,
+        // The customer filter is the barrier: read in-process, the collection never meets
+        // the core's customer extension (no security token, and the current request is not
+        // an /api/front/account route).
+        $orders = $this->paginator->page('/api/front/account/orders', [
+            'customer.id' => $customer->getId(),
             'order[createdAt]' => 'desc',
-            'itemsPerPage' => self::ITEMS_PER_PAGE,
-            'page' => $page,
-        ], 'jsonld');
+        ], $page ?? CollectionPaginator::requestedPage($this->requestStack->getCurrentRequest()), self::ITEMS_PER_PAGE);
 
-        return \is_array($response) ? $response : [];
+        $this->orders = $orders->members;
+        $this->pagination = $orders->pagination();
     }
 }
