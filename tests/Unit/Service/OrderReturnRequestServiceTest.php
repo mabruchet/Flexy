@@ -56,11 +56,10 @@ use Thelia\Model\Order;
  * database map that exists but names no connection - share no common ancestor other than
  * `Propel\Runtime\Exception\ExceptionInterface`, so that is what is caught, not either concrete
  * class. What this cannot show is the persist step that would follow a successful read - that
- * half of the ordering is checked by inspection, not by this suite (see the class-level
+ * half of the ordering is checked by inspection, not by this suite.
  *
- * @see below).
- * @see OrderReturnRequestService::open() the hydrate() call and the persist() call that
- *      follows it sit as the only two statements of the closure passed to run() - reading the
+ * @see OrderReturnRequestService::open() the hydrate() call, the quota check and the persist()
+ *      call that follows sit as the only statements of the closure passed to run() - reading the
  *      production method alongside this test is part of the proof.
  */
 #[CoversClass(OrderReturnRequestService::class)]
