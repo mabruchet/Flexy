@@ -140,9 +140,8 @@ final readonly class OrderReturnRequestService
 
         // Announced once the return is committed, never from inside the transaction:
         // a mail is not something a rollback takes back. Reuses the exact dispatch
-        // every create processor of the return API already shares, wrapping the
-        // written model back into a resource only to satisfy its signature.
-        $this->statusEmailDispatcher->dispatch((new OrderReturnResource())->setPropelModel($model));
+        // every create processor of the return API already shares.
+        $this->statusEmailDispatcher->dispatchFor($model);
 
         return $model;
     }
