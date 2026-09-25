@@ -109,10 +109,6 @@ final readonly class OrderReturnRequestService
             throw new ReturnNotAllowedException('The comment is too long.');
         }
 
-        if (!$this->limiter->allows($customer)) {
-            throw new TooManyReturnRequestsException('Too many return requests, please try again later.');
-        }
-
         $resource = $this->buildResource($order, $requestedLines, $this->visibleReasonId($reasonId), $resolution, $comment);
 
         // Reading how much of a line is still returnable and writing the return that
@@ -128,6 +124,15 @@ final readonly class OrderReturnRequestService
             array_map('intval', array_keys($requestedLines)),
             function (ConnectionInterface $connection) use ($resource, $order, $customer): OrderReturnModel {
                 $this->hydrator->hydrate($resource, $customer, false);
+
+                // The quota counts the returns a customer opens, not the mistakes they make
+                // filling the form in: consumed only once hydration has accepted the request,
+                // exactly where the core's own OrderReturnFrontCreateProcessor spends it. A
+                // form submitted with an ineligible line never reaches this check, so it costs
+                // nothing towards the quota an accepted request spends.
+                if (!$this->limiter->allows($customer)) {
+                    throw new TooManyReturnRequestsException('Too many return requests, please try again later.');
+                }
 
                 return $this->persist($resource, $order, $customer, $connection);
             },
