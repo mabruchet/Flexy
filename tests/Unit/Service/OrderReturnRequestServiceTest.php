@@ -123,6 +123,27 @@ final class OrderReturnRequestServiceTest extends TestCase
         }
     }
 
+    /**
+     * The quota is spent on an accepted return, not on a customer's typo: a line that
+     * fails hydration must never reach the limiter, or twenty malformed submissions on
+     * the same key would close the hour for the one valid request behind them.
+     */
+    public function testAFailingHydrationDoesNotConsumeTheQuota(): void
+    {
+        $transaction = new RecordingWriteTransaction($this->createStub(ConnectionInterface::class));
+
+        $limiter = $this->createMock(ReturnRequestLimiter::class);
+        $limiter->expects(self::never())->method('allows');
+
+        try {
+            $this->service($transaction, $limiter)->open($this->order(42), $this->customer(7), [101 => 1.0], null, 'refund', null);
+            self::fail('The real hydrator was expected to fail outside a booted kernel.');
+        } catch (PropelExceptionInterface) {
+            // The mock expectation above is the assertion: PHPUnit fails the test on
+            // tearDown if allows() was called before this catch was reached.
+        }
+    }
+
     public function testAnExceptionRaisedInsideTheCallbackReachesTheCallerUnchanged(): void
     {
         $transaction = new RecordingWriteTransaction($this->createStub(ConnectionInterface::class));
@@ -140,13 +161,15 @@ final class OrderReturnRequestServiceTest extends TestCase
         }
     }
 
-    private function service(OrderReturnWriteTransactionInterface $transaction): OrderReturnRequestService
+    private function service(OrderReturnWriteTransactionInterface $transaction, ?ReturnRequestLimiter $limiter = null): OrderReturnRequestService
     {
         $eligibility = new ReturnEligibilityChecker();
         $hydrator = new OrderReturnHydrator($eligibility, new OrderReturnComposer($eligibility, new RefundAmountCalculator()));
 
-        $limiter = $this->createMock(ReturnRequestLimiter::class);
-        $limiter->method('allows')->willReturn(true);
+        if (null === $limiter) {
+            $limiter = $this->createMock(ReturnRequestLimiter::class);
+            $limiter->method('allows')->willReturn(true);
+        }
 
         return new OrderReturnRequestService(
             $eligibility,
