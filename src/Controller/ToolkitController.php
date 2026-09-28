@@ -16,9 +16,9 @@ namespace FlexyBundle\Controller;
 
 use FlexyBundle\Template\FrontTemplateChain;
 use FlexyBundle\Toolkit\ComponentStatus;
+use FlexyBundle\Toolkit\StoryFinder;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Profiler\Profiler;
@@ -29,6 +29,7 @@ class ToolkitController extends AbstractController
 {
     public function __construct(
         private readonly FrontTemplateChain $templateChain,
+        private readonly StoryFinder $storyFinder,
         // By id: the service carries no alias for its class, and it only exists where the
         // profiler is installed.
         #[Autowire(service: 'profiler')]
@@ -124,58 +125,7 @@ class ToolkitController extends AbstractController
      */
     private function getGroupedComponents(): array
     {
-        // The component directories of the whole chain, nearest first. A story the active
-        // template ships under the path of one of its parent's replaces it: same slug, same
-        // status key, the nearest file.
-        $componentDirectories = array_values(array_filter(
-            array_map(static fn (string $directory): string => $directory . '/components', $this->templateChain->directories()),
-            is_dir(...),
-        ));
-
-        $finder = (new Finder())
-            ->files()
-            ->name('toolkit.html.twig')
-            ->in($componentDirectories)
-            ->sortByName();
-
-        $seen = [];
-        $grouped = [];
-
-        foreach ($finder as $file) {
-            if (isset($seen[$file->getRelativePathname()])) {
-                continue;
-            }
-
-            $seen[$file->getRelativePathname()] = true;
-            $status = ComponentStatus::of($file->getRelativePath());
-
-            if (ComponentStatus::HIDDEN === $status) {
-                continue;
-            }
-
-            $parts = explode('/', $file->getRelativePath());
-            $category = $parts[0];
-            $name = \count($parts) > 1 ? implode(' / ', \array_slice($parts, 1)) : $category;
-            $slug = strtolower(implode('-', $parts));
-
-            $grouped[$category][] = [
-                'twigPath' => '@Flexy/' . $file->getRelativePathname(),
-                'path' => $file->getRealPath(),
-                'name' => $name,
-                'slug' => $slug,
-                'status' => $status,
-            ];
-        }
-
-        foreach (['Forms', 'Layouts'] as $category) {
-            if (isset($grouped[$category])) {
-                $items = $grouped[$category];
-                unset($grouped[$category]);
-                $grouped[$category] = $items;
-            }
-        }
-
-        return $grouped;
+        return $this->storyFinder->groupedComponents();
     }
 
     /**
