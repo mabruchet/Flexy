@@ -28,12 +28,18 @@ namespace FlexyBundle\Toolkit;
  * HIDDEN means the component will never be integrated: its story is dropped from the
  * toolkit. The files stay, and so does its CSS import — until the last call site is gone,
  * removing the import would leave the component rendering unstyled somewhere.
+ *
+ * This list is the default of the chain. A child template does not edit it: it ships its own
+ * `components/Toolkit/story-statuses.php` (see StoryFinder), which answers for the paths it names.
  */
 final class ComponentStatus
 {
     public const string READY = 'ready';
     public const string WAITING = 'waiting';
     public const string HIDDEN = 'hidden';
+
+    /** What a template's registry may declare: anything else is refused, not ignored. */
+    public const array ALL = [self::READY, self::WAITING, self::HIDDEN];
 
     /**
      * The short arms come first so that what is not ready reads in a glance.

@@ -139,7 +139,7 @@ class ToolkitController extends AbstractController
                     continue;
                 }
 
-                $status = ComponentStatus::of('Toolkit/' . $slug);
+                $status = $this->storyFinder->statusOf('Toolkit/' . $slug);
 
                 // `hidden` means the same here as for a component: gone from the toolkit.
                 if (ComponentStatus::HIDDEN === $status) {

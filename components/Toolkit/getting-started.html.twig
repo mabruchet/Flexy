@@ -29,6 +29,9 @@
             Statuses live in <code>src/Toolkit/ComponentStatus.php</code>, keyed by the story path
             under <code>components/</code>. The list ships empty, and a story absent from it claims
             nothing. <strong>It is not a backlog</strong> — only a way to say what has been settled.
+            A child template leaves that file alone and ships <code>components/Toolkit/story-statuses.php</code>,
+            a plain list of story path =&gt; status: it answers for the stories it names, its own
+            and Flexy's.
         </p>
 
         <ul class="Toolkit-legend">

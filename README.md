@@ -50,7 +50,9 @@ what it overrides, and Flexy answers for the rest:
 | An `importmap.php`, Stimulus controllers | Its own; without them, Flexy's serve |
 
 `/toolkit` lists the stories of the whole chain, the child's first, and previews them at the
-breakpoints of the nearest `variables.css`.
+breakpoints of the nearest `variables.css`. Their statuses come from `components/Toolkit/story-statuses.php`
+(`return ['Molecules/Button' => ComponentStatus::READY];`, values `ready`, `waiting` or `hidden`):
+the nearest template that names a story answers for it, `ComponentStatus` for the rest.
 
 The project has one setting to check: `twig_component.anonymous_template_directory` must be
 `'@Flexy'` (`config/packages/twig_component.yaml`). A project configuration may set a filesystem
