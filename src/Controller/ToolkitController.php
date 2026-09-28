@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Controller;
 
+use FlexyBundle\Template\FrontTemplateChain;
 use FlexyBundle\Toolkit\ComponentStatus;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Finder\Finder;
@@ -24,6 +25,11 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/toolkit', name: 'toolkit_')]
 class ToolkitController extends AbstractController
 {
+    public function __construct(
+        private readonly FrontTemplateChain $templateChain,
+    ) {
+    }
+
     /**
      * The pages that are not components, by sidebar group. Each is listed only while its file
      * is there, so deleting the file retires the page, navigation entry included.
@@ -105,15 +111,29 @@ class ToolkitController extends AbstractController
      */
     private function getGroupedComponents(): array
     {
+        // The component directories of the whole chain, nearest first. A story the active
+        // template ships under the path of one of its parent's replaces it: same slug, same
+        // status key, the nearest file.
+        $componentDirectories = array_values(array_filter(
+            array_map(static fn (string $directory): string => $directory . '/components', $this->templateChain->directories()),
+            is_dir(...),
+        ));
+
         $finder = (new Finder())
             ->files()
             ->name('toolkit.html.twig')
-            ->in(\dirname(__DIR__, 2) . '/components')
+            ->in($componentDirectories)
             ->sortByName();
 
+        $seen = [];
         $grouped = [];
 
         foreach ($finder as $file) {
+            if (isset($seen[$file->getRelativePathname()])) {
+                continue;
+            }
+
+            $seen[$file->getRelativePathname()] = true;
             $status = ComponentStatus::of($file->getRelativePath());
 
             if (ComponentStatus::HIDDEN === $status) {
@@ -159,7 +179,7 @@ class ToolkitController extends AbstractController
 
         foreach (self::SECTIONS as $group => $slugs) {
             foreach ($slugs as $slug => $section) {
-                if (!is_file(\dirname(__DIR__, 2) . '/components/Toolkit/' . $slug . '.html.twig')) {
+                if (null === $this->templateChain->nearest('components/Toolkit/' . $slug . '.html.twig', is_file(...))) {
                     continue;
                 }
 
@@ -219,8 +239,10 @@ class ToolkitController extends AbstractController
      */
     private function getBreakpoints(): array
     {
-        $variablesPath = \dirname(__DIR__, 2) . '/assets/styles/variables.css';
-        $css = is_file($variablesPath) ? file_get_contents($variablesPath) : '';
+        // The nearest tokens file of the chain: a child template that redefines the breakpoints
+        // ships its own variables.css, and the toolkit has to preview at its widths.
+        $variablesDirectory = $this->templateChain->nearest('assets/styles/variables.css', is_file(...));
+        $css = null === $variablesDirectory ? '' : file_get_contents($variablesDirectory . '/assets/styles/variables.css');
 
         preg_match_all('/--breakpoint-([\w-]+):\s*([\d.]+)rem/', (string) $css, $matches, \PREG_SET_ORDER);
 

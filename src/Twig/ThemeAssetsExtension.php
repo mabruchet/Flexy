@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Twig;
 
+use FlexyBundle\Template\FrontTemplateChain;
 use Symfony\Component\Finder\Finder;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
@@ -24,6 +25,11 @@ use Twig\TwigFunction;
  */
 class ThemeAssetsExtension extends AbstractExtension
 {
+    public function __construct(
+        private readonly FrontTemplateChain $templateChain,
+    ) {
+    }
+
     public function getFunctions(): array
     {
         return [
@@ -34,7 +40,7 @@ class ThemeAssetsExtension extends AbstractExtension
 
     /**
      * Icon names in the form ux_icon() takes: `name` at the root, `subdir:name` below it.
-     * Reads the theme's own directory, not the bundle's configured icon_dir.
+     * Reads the icon directories of the whole template chain, not the bundle's configured icon_dir.
      *
      * @return array<string, list<string>>
      */
@@ -70,24 +76,39 @@ class ThemeAssetsExtension extends AbstractExtension
      */
     private function inventory(string $directory, ?string $name, callable $format): array
     {
-        // Located from this class rather than a container parameter, so the theme stays movable.
-        $root = \dirname(__DIR__, 2) . '/assets/' . $directory;
-
-        if (!is_dir($root)) {
-            return [];
-        }
-
-        $finder = (new Finder())->files()->in($root)->sortByName();
-
-        if (null !== $name) {
-            $finder->name($name);
-        }
-
         $grouped = [];
+        $seen = [];
 
-        foreach ($finder as $file) {
-            $namespace = str_replace('\\', '/', $file->getRelativePath());
-            $grouped[$namespace][] = $format($namespace, str_replace('\\', '/', $file->getRelativePathname()));
+        // Every template of the chain, nearest first: a file a child ships under the name of
+        // one of its parent's replaces it, and the parent's other files stay listed.
+        foreach ($this->templateChain->directories() as $templateDirectory) {
+            $root = $templateDirectory . '/assets/' . $directory;
+
+            if (!is_dir($root)) {
+                continue;
+            }
+
+            $finder = (new Finder())->files()->in($root)->sortByName();
+
+            if (null !== $name) {
+                $finder->name($name);
+            }
+
+            foreach ($finder as $file) {
+                $relativePathname = str_replace('\\', '/', $file->getRelativePathname());
+
+                if (isset($seen[$relativePathname])) {
+                    continue;
+                }
+
+                $seen[$relativePathname] = true;
+                $namespace = str_replace('\\', '/', $file->getRelativePath());
+                $grouped[$namespace][] = $format($namespace, $relativePathname);
+            }
+        }
+
+        foreach ($grouped as &$names) {
+            sort($names);
         }
 
         ksort($grouped);
