@@ -165,6 +165,76 @@ final class FlexyBundlePrependTest extends TestCase
         self::assertSame('FlexyForm', $paths[$this->parentTemplateDirectory.'/form'] ?? null);
     }
 
+    public function testEachTemplateOfTheChainIsRegisteredUnderItsOwnTwigNamespace(): void
+    {
+        $paths = $this->configOf($this->prependFor($this->childTemplate), 'twig')['paths'];
+
+        self::assertSame('theme_flexy', $paths[$this->parentTemplateDirectory] ?? null);
+        self::assertSame(FlexyBundle::templateNamespace($this->childTemplateDirectory), $paths[$this->childTemplateDirectory] ?? null);
+    }
+
+    public function testATemplateNamespaceOnlyCarriesCharactersATwigNameAccepts(): void
+    {
+        self::assertSame('theme_my_shop_2', FlexyBundle::templateNamespace('/templates/frontOffice/my-shop.2'));
+    }
+
+    public function testAnonymousComponentsAreLookedUpThroughTheComponentNamespace(): void
+    {
+        self::assertSame(
+            '@Flexy',
+            $this->configOf($this->prependFor($this->childTemplate), 'twig_component')['anonymous_template_directory'],
+            'A filesystem path would be the nearest components/ alone: a child that ships one component would lose every anonymous component of its parent.',
+        );
+    }
+
+    public function testTheIconDirectoryStaysTheOneOfThisTemplateWhenTheChildShipsIcons(): void
+    {
+        (new Filesystem())->dumpFile($this->childTemplateDirectory.'/assets/icons/cart.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>');
+
+        self::assertSame(
+            $this->parentTemplateDirectory.'/assets/icons',
+            $this->uxIconsConfigFor($this->childTemplate)['icon_dir'],
+        );
+    }
+
+    public function testTheIconsOfTheChildAreRegisteredBeforeTheOnesOfThisTemplate(): void
+    {
+        (new Filesystem())->dumpFile($this->childTemplateDirectory.'/assets/icons/cart.svg', '<svg xmlns="http://www.w3.org/2000/svg"/>');
+
+        $builder = $this->loadFor($this->childTemplate);
+        $definition = $builder->getDefinition('flexy.icon_registry.'.$this->childTemplate);
+
+        self::assertSame($this->childTemplateDirectory.'/assets/icons', $definition->getArgument(1));
+
+        $priority = $definition->getTag('ux_icons.registry')[0]['priority'] ?? null;
+
+        self::assertIsInt($priority);
+        self::assertGreaterThan(10, $priority, 'ux-icons registers its own local registry at 10; the child must answer before it.');
+    }
+
+    public function testAChildWithoutIconsRegistersNoIconRegistry(): void
+    {
+        self::assertFalse($this->loadFor($this->childTemplate)->hasDefinition('flexy.icon_registry.'.$this->childTemplate));
+    }
+
+    public function testTheTranslationCataloguesOfTheChildAreDeclaredAfterTheOnesOfThisTemplate(): void
+    {
+        (new Filesystem())->dumpFile($this->childTemplateDirectory.'/translations/messages.fr_FR.yaml', "Cart: Panier\n");
+
+        $translator = $this->configOf($this->prependFor($this->childTemplate), 'framework')['translator'] ?? null;
+
+        // The framework registers a bundle's translations/ on its own, before the configured
+        // paths; only the child is declared, and a key it repeats replaces the one of this template.
+        self::assertSame([$this->childTemplateDirectory.'/translations'], $translator['paths'] ?? null);
+    }
+
+    public function testNoTranslationPathIsDeclaredWhenTheChildShipsNoCatalogue(): void
+    {
+        $framework = $this->configOf($this->prependFor($this->childTemplate), 'framework');
+
+        self::assertArrayNotHasKey('translator', $framework);
+    }
+
     public function testATemplateThatInheritsFromNothingKeepsItsOwnDirectories(): void
     {
         $assetMapper = $this->configOf($this->prependFor(self::PARENT_TEMPLATE), 'framework')['asset_mapper'];
@@ -199,7 +269,25 @@ final class FlexyBundlePrependTest extends TestCase
         );
     }
 
+    private function loadFor(string $frontTemplate): ContainerBuilder
+    {
+        $builder = $this->builderFor($frontTemplate);
+
+        (new FlexyBundle())->loadExtension([], $this->configuratorFor($builder), $builder);
+
+        return $builder;
+    }
+
     private function prependFor(string $frontTemplate): ContainerBuilder
+    {
+        $builder = $this->builderFor($frontTemplate);
+
+        (new FlexyBundle())->prependExtension($this->configuratorFor($builder), $builder);
+
+        return $builder;
+    }
+
+    private function builderFor(string $frontTemplate): ContainerBuilder
     {
         $builder = new ContainerBuilder();
         $builder->setParameter('thelia_front_template', $frontTemplate);
@@ -228,8 +316,6 @@ final class FlexyBundlePrependTest extends TestCase
                 }
             });
         }
-
-        (new FlexyBundle())->prependExtension($this->configuratorFor($builder), $builder);
 
         return $builder;
     }
