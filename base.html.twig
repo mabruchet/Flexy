@@ -6,6 +6,14 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
+        {# Preconnections and the stylesheet of the fonts, together: a child template that hosts
+           its own fonts replaces both with its preloads, and loads nothing from a third party. #}
+        {% block fonts %}
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+        {% endblock %}
+
         {# block() hands back what autoescaping already escaped, and whoever answers the hook
            escapes what it prints: passing the string on escapes it twice, an apostrophe coming
            out as &amp;#039;. A {% set %} capture is Markup, which the escaper leaves alone. #}
@@ -46,14 +54,6 @@
             <link rel="shortcut icon" href="{{ asset('favicons/favicon.ico') }}"/>
             <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('favicons/apple-touch-icon.png') }}"/>
             <link rel="manifest" href="{{ asset('favicons/site.webmanifest') }}"/>
-        {% endblock %}
-
-        {# Preconnections and the stylesheet of the fonts, together: a child template that hosts
-           its own fonts replaces both with its preloads, and loads nothing from a third party. #}
-        {% block fonts %}
-            <link rel="preconnect" href="https://fonts.googleapis.com">
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-            <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
         {% endblock %}
 
         {% block stylesheets %}
