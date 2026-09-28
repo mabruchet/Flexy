@@ -35,6 +35,28 @@ ACTIVE_FRONT_TEMPLATE=flexy
 
 A component owns its template, its styles and its behaviour in a single directory. `Base.php` holds the data, `Base.html.twig` the markup, `Base.css` the styles, `base_controller.js` the interactions.
 
+## Child templates
+
+A template of the shop that declares `<parent>flexy</parent>` in its `template.xml` ships only
+what it overrides, and Flexy answers for the rest:
+
+| It ships | What happens |
+|---|---|
+| A root page (`product.html.twig`) | Replaces Flexy's. To extend one instead of copying it, `{% extends '@theme_flexy/base.html.twig' %}`: every template of the chain is registered under `@theme_<name>`. `base.html.twig` exposes the `favicons` and `fonts` blocks for the two things a shop always replaces |
+| A component directory (`components/Molecules/Button/`) | Replaces Flexy's, anonymous components included; the other components of Flexy stay available |
+| `assets/styles/app.css` | Becomes the Tailwind entry point. Import Flexy's (`@import "../../../flexy/assets/styles/app.css"`), which carries its `@source` list, then add your own sources and a `@theme` block: a token declared there replaces Flexy's |
+| `assets/icons/*.svg` | Added to Flexy's icons; a file of the same name replaces it everywhere `ux_icon()` asks for that name |
+| `translations/messages.<locale>.yaml` | Loaded after Flexy's: a key it repeats replaces Flexy's |
+| An `importmap.php`, Stimulus controllers | Its own; without them, Flexy's serve |
+
+`/toolkit` lists the stories of the whole chain, the child's first, and previews them at the
+breakpoints of the nearest `variables.css`.
+
+The project has one setting to check: `twig_component.anonymous_template_directory` must be
+`'@Flexy'` (`config/packages/twig_component.yaml`). The thelia-project skeleton sets a filesystem
+path there, which is the nearest `components/` directory alone: a child that ships one component
+would then lose every anonymous component of Flexy.
+
 ## Extending it
 
 The template declares `theme_hook()` extension points across its pages — `layout.head.top`, `product.bottom`, `cart.top` and others. A module answers one by implementing `Thelia\Core\Hook\Theme\ThemeHookInterface`; the tag priority drives the rendering order.
