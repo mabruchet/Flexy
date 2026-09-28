@@ -53,9 +53,17 @@ what it overrides, and Flexy answers for the rest:
 breakpoints of the nearest `variables.css`.
 
 The project has one setting to check: `twig_component.anonymous_template_directory` must be
-`'@Flexy'` (`config/packages/twig_component.yaml`). The thelia-project skeleton sets a filesystem
+`'@Flexy'` (`config/packages/twig_component.yaml`). A project configuration may set a filesystem
 path there, which is the nearest `components/` directory alone: a child that ships one component
 would then lose every anonymous component of Flexy.
+
+`debug:twig-component` cannot read a namespace in that setting, so Flexy hands it the nearest
+`components/` directory of the chain instead: the child's anonymous components are listed under
+their own name, the ones it inherits under the `theme_<name>:` prefix only.
+
+`ux:icons:import` writes into Flexy's `assets/icons/` (the `ux_icons.icon_dir` Flexy configures,
+as `<prefix>/<name>.svg`), not the child's: move the imported file into the child's
+`assets/icons/` afterwards.
 
 ## Extending it
 

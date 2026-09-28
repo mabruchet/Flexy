@@ -16,6 +16,8 @@ services:
 
     FlexyBundle\:
         resource: '../src/'
+        # Compiler passes are registered by the bundle, not services.
+        exclude: '../src/DependencyInjection/'
 
     FlexyBundle\Components\:
         resource: '../components/'

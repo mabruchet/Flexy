@@ -30,12 +30,36 @@ use Thelia\Core\Template\TemplateService;
 final class FrontTemplateChain
 {
     /** @var list<string>|null */
+    private ?array $inherited = null;
+
+    /** @var list<string>|null */
     private ?array $directories = null;
 
     public function __construct(
         #[Autowire('%thelia_front_template%')]
         private readonly string $frontTemplate,
     ) {
+    }
+
+    /**
+     * The active template and the ones it inherits from, nearest first, exactly as their
+     * descriptors declare them: this template is part of it only when the active template is,
+     * or inherits from, this one. The container configuration needs that distinction: a
+     * template that inherits from nothing registers its own Stimulus controllers, not ours.
+     *
+     * @return list<string>
+     */
+    public function inherited(): array
+    {
+        if (null !== $this->inherited) {
+            return $this->inherited;
+        }
+
+        $chain = '' === $this->frontTemplate
+            ? []
+            : TemplateService::getTemplateChainAbsolutePath(TemplateDefinition::FRONT_OFFICE_SUBDIR, $this->frontTemplate);
+
+        return $this->inherited = array_values(array_unique($chain));
     }
 
     /**
@@ -50,17 +74,14 @@ final class FrontTemplateChain
             return $this->directories;
         }
 
-        $chain = '' === $this->frontTemplate
-            ? []
-            : TemplateService::getTemplateChainAbsolutePath(TemplateDefinition::FRONT_OFFICE_SUBDIR, $this->frontTemplate);
-
+        $chain = $this->inherited();
         $own = self::ownDirectory();
 
         if (!\in_array($own, array_map(self::realPath(...), $chain), true)) {
             $chain[] = $own;
         }
 
-        return $this->directories = array_values(array_unique($chain));
+        return $this->directories = $chain;
     }
 
     /**
@@ -68,13 +89,31 @@ final class FrontTemplateChain
      */
     public function nearest(string $relativePath, callable $exists): ?string
     {
+        return self::firstShipping($this->directories(), $relativePath, $exists);
+    }
+
+    /**
+     * The same, restricted to the templates the active one declares: null when none of them
+     * ships the file, even though this template does.
+     */
+    public function nearestInherited(string $relativePath, callable $exists): ?string
+    {
+        return self::firstShipping($this->inherited(), $relativePath, $exists);
+    }
+
+    /**
+     * This template's directory as the chain names it (through the template symlink when it is
+     * installed by one), or its real location when the active template does not inherit from it.
+     */
+    public function ownInChain(): string
+    {
         foreach ($this->directories() as $directory) {
-            if ($exists($directory . '/' . ltrim($relativePath, '/'))) {
+            if (self::isOwn($directory)) {
                 return $directory;
             }
         }
 
-        return null;
+        return self::ownDirectory();
     }
 
     /**
@@ -88,6 +127,20 @@ final class FrontTemplateChain
     public static function ownDirectory(): string
     {
         return self::realPath(\dirname(__DIR__, 2));
+    }
+
+    /**
+     * @param list<string> $directories
+     */
+    private static function firstShipping(array $directories, string $relativePath, callable $exists): ?string
+    {
+        foreach ($directories as $directory) {
+            if ($exists($directory . '/' . ltrim($relativePath, '/'))) {
+                return $directory;
+            }
+        }
+
+        return null;
     }
 
     private static function realPath(string $path): string
