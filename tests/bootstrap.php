@@ -52,6 +52,13 @@ if (null === $hostRoot) {
     exit(1);
 }
 
+// A thelia-project host roots the Thelia directory constants in its own bootstrap.php, to be
+// read before the autoloader: the core's autoloaded bootstrap otherwise defines them from its
+// own location, under vendor/, and the template chain is looked up outside the project.
+if (is_file($hostRoot.'/bootstrap.php')) {
+    require_once $hostRoot.'/bootstrap.php';
+}
+
 /** @var ClassLoader $loader */
 $loader = require $hostRoot.'/vendor/autoload.php';
 
