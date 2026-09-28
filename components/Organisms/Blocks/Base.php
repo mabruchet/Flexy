@@ -48,8 +48,8 @@ class Base
 
         // The blocks live in the tables of the TheliaBlocks module: a shop that keeps it inactive
         // has neither the tables nor the generated models, and the page has to render without.
-        // This guard also covers a module active in the database whose classes are missing from
-        // disk, and avoids an unnecessary call to the renderer.
+        // ModuleQuery::getActivated() is cached for the request: the guard costs one query per page,
+        // and spares the renderer a call that would find nothing.
         if (!$this->activeModules->has('TheliaBlocks')) {
             return;
         }

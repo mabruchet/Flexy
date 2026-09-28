@@ -85,7 +85,7 @@ class ToolkitController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $grouped = $this->getGroupedComponents();
+        $grouped = $this->storyFinder->groupedComponents();
         $pages = $this->buildPages($grouped);
 
         $slug ??= isset($pages[self::HOME]) ? self::HOME : array_key_first($pages);
@@ -120,13 +120,6 @@ class ToolkitController extends AbstractController
         return $response;
     }
 
-    /**
-     * @return array<string, list<array{twigPath: string, path: string, name: string, slug: string, status: string|null}>>
-     */
-    private function getGroupedComponents(): array
-    {
-        return $this->storyFinder->groupedComponents();
-    }
 
     /**
      * Flattens everything into one slug-indexed map, so every page resolves the same way. A

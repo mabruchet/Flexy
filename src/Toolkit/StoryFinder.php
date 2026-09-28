@@ -55,7 +55,7 @@ final readonly class StoryFinder
 
             $grouped[$category][] = [
                 'twigPath' => '@Flexy/' . $relativePathname,
-                'path' => (string) $file->getRealPath(),
+                'path' => $file->getPathname(),
                 'name' => \count($parts) > 1 ? implode(' / ', \array_slice($parts, 1)) : $category,
                 'slug' => strtolower(implode('-', $parts)),
                 'status' => $status,

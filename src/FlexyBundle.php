@@ -226,7 +226,9 @@ class FlexyBundle extends AbstractBundle
 
         // The importmap and the vendor assets it downloads belong to the same template: a
         // child template that ships none of its own runs on those of its parent.
-        $importmapDirectory = $chain->nearest('importmap.php', is_file(...)) ?? \dirname(__DIR__);
+        // directories() always ends with this template, which ships an importmap: never null.
+        $importmapDirectory = $chain->nearest('importmap.php', is_file(...))
+            ?? throw new \LogicException('This template ships an importmap.php.');
 
         $containerBuilder->prependExtensionConfig('framework', [
             'asset_mapper' => [
