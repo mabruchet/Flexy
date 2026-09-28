@@ -18,6 +18,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Thelia\Core\Content\BlockRendererInterface;
 use Thelia\Core\HttpFoundation\Session\Session;
+use Thelia\Model\ModuleQuery;
 
 #[AsTwigComponent]
 class Base
@@ -44,6 +45,12 @@ class Base
         $this->itemId = $itemId;
         $this->visible = $visible;
 
+        // The blocks live in the tables of the TheliaBlocks module: a shop that keeps it inactive
+        // has neither the tables nor the generated models, and the page has to render without.
+        if (!self::theliaBlocksIsActive()) {
+            return;
+        }
+
         $session = $this->requestStack->getCurrentRequest()?->getSession();
         $locale = $session instanceof Session ? $session->getLang()?->getLocale() : null;
 
@@ -55,5 +62,16 @@ class Base
             'visible' => $this->visible,
             'locale' => $locale,
         ]);
+    }
+
+    private static function theliaBlocksIsActive(): bool
+    {
+        foreach (ModuleQuery::getActivated() as $module) {
+            if ('TheliaBlocks' === $module->getCode()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

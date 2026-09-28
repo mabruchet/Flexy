@@ -17,6 +17,7 @@ namespace FlexyBundle\Components\Organisms\BlocksToc;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Thelia\Core\HttpFoundation\Session\Session;
+use Thelia\Model\ModuleQuery;
 use TheliaBlocks\Model\BlockGroupQuery;
 
 #[AsTwigComponent]
@@ -40,6 +41,12 @@ class Base
         $this->itemType = $itemType;
         $this->itemId = $itemId;
         $this->maxLevel = $maxLevel;
+
+        // The blocks live in the tables of the TheliaBlocks module: a shop that keeps it inactive
+        // has neither the tables nor the generated models, and the page has to render without.
+        if (!self::theliaBlocksIsActive()) {
+            return;
+        }
 
         $session = $this->requestStack->getCurrentRequest()?->getSession();
         $locale = $session instanceof Session ? $session->getLang()?->getLocale() : null;
@@ -93,5 +100,16 @@ class Base
                 ];
             }
         }
+    }
+
+    private static function theliaBlocksIsActive(): bool
+    {
+        foreach (ModuleQuery::getActivated() as $module) {
+            if ('TheliaBlocks' === $module->getCode()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
