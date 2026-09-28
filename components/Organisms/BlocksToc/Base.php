@@ -14,10 +14,10 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Components\Organisms\BlocksToc;
 
+use FlexyBundle\Module\ActiveModules;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Thelia\Core\HttpFoundation\Session\Session;
-use Thelia\Model\ModuleQuery;
 use TheliaBlocks\Model\BlockGroupQuery;
 
 #[AsTwigComponent]
@@ -33,6 +33,7 @@ class Base
 
     public function __construct(
         private readonly RequestStack $requestStack,
+        private readonly ActiveModules $activeModules,
     ) {
     }
 
@@ -44,7 +45,7 @@ class Base
 
         // The blocks live in the tables of the TheliaBlocks module: a shop that keeps it inactive
         // has neither the tables nor the generated models, and the page has to render without.
-        if (!self::theliaBlocksIsActive()) {
+        if (!$this->activeModules->has('TheliaBlocks')) {
             return;
         }
 
@@ -100,16 +101,5 @@ class Base
                 ];
             }
         }
-    }
-
-    private static function theliaBlocksIsActive(): bool
-    {
-        foreach (ModuleQuery::getActivated() as $module) {
-            if ('TheliaBlocks' === $module->getCode()) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
