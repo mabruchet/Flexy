@@ -17,9 +17,11 @@ namespace FlexyBundle\Controller;
 use FlexyBundle\Template\FrontTemplateChain;
 use FlexyBundle\Toolkit\ComponentStatus;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Profiler\Profiler;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/toolkit', name: 'toolkit_')]
@@ -27,6 +29,10 @@ class ToolkitController extends AbstractController
 {
     public function __construct(
         private readonly FrontTemplateChain $templateChain,
+        // By id: the service carries no alias for its class, and it only exists where the
+        // profiler is installed.
+        #[Autowire(service: 'profiler')]
+        private readonly ?Profiler $profiler = null,
     ) {
     }
 
@@ -88,12 +94,19 @@ class ToolkitController extends AbstractController
         }
 
         $page = $pages[$slug];
+        $embed = $request->query->getBoolean('embed');
+
+        // Embedded, the story is read by a script that measures its cells and audits the page:
+        // the debug toolbar would be measured and audited with it.
+        if ($embed) {
+            $this->profiler?->disable();
+        }
 
         $response = $this->render('@Flexy/Toolkit/show.html.twig', [
             'grouped' => $grouped,
             'sections' => $this->groupSections($pages),
             'breakpoints' => $this->getBreakpoints(),
-            'embed' => $request->query->getBoolean('embed'),
+            'embed' => $embed,
             'currentSlug' => $slug,
             'page' => $page,
             'source' => isset($page['path']) ? file_get_contents($page['path']) : null,
