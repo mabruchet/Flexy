@@ -53,9 +53,16 @@ final readonly class StoryFinder
             $parts = explode('/', $relativePath);
             $category = $parts[0];
 
+            // A dangling link has no real path: the story is dropped rather than read from ''.
+            $path = $file->getRealPath();
+
+            if (false === $path) {
+                continue;
+            }
+
             $grouped[$category][] = [
                 'twigPath' => '@Flexy/' . $relativePathname,
-                'path' => $file->getPathname(),
+                'path' => $path,
                 'name' => \count($parts) > 1 ? implode(' / ', \array_slice($parts, 1)) : $category,
                 'slug' => strtolower(implode('-', $parts)),
                 'status' => $status,
