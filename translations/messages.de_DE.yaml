@@ -495,3 +495,7 @@ Your new password again: Neues Passwort wiederholen
 # Tag close button (components/Molecules/Tag/Base.html.twig)
 Remove: Entfernen
 "Remove %label%": "%label% entfernen"
+
+# VAT exemption (Summary/Checkout, Summary/Order, AddressCard)
+VAT verified on %date%: USt-IdNr. geprüft am %date%
+VAT exempted (reverse charge), buyer VAT number %number%: 'Steuerfrei (Reverse-Charge), USt-IdNr. des Käufers: %number%'
