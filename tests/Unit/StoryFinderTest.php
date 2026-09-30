@@ -16,7 +16,10 @@ namespace FlexyBundle\Tests\Unit;
 
 use FlexyBundle\Template\FrontTemplateChain;
 use FlexyBundle\Toolkit\ComponentStatus;
+use FlexyBundle\Toolkit\ModuleStories;
+use FlexyBundle\Toolkit\Story;
 use FlexyBundle\Toolkit\StoryFinder;
+use FlexyBundle\Toolkit\StoryProviderInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -24,6 +27,7 @@ use Symfony\Component\Filesystem\Filesystem;
  * A child template overrides a story by shipping it under the same path as its parent: the
  * toolkit must then show the child's file, whatever the two templates are called. It says
  * where its stories stand the same way, without touching Flexy: a registry file of its own.
+ * The stories of the modules follow those of the whole chain, and may not take their slugs.
  */
 final class StoryFinderTest extends TestCase
 {
@@ -187,6 +191,42 @@ final class StoryFinderTest extends TestCase
         $this->finderFor($this->childTemplate)->statusOf('Molecules/Button');
     }
 
+    public function testTheModuleStoriesComeAfterThoseOfTheChain(): void
+    {
+        $this->childShips('components/Molecules/Card/toolkit.html.twig');
+
+        $grouped = $this->finderFor(
+            $this->childTemplate,
+            $this->moduleStory('Molecules', 'Aa demo'),
+            $this->moduleStory('Modules', 'Flexy extension demo / Callout'),
+        )->groupedComponents();
+
+        $molecules = array_column($grouped['Molecules'] ?? [], 'slug');
+
+        self::assertContains('molecules-card', $molecules);
+        self::assertSame('molecules-aa-demo', end($molecules), 'A module story is sorted among those of the chain.');
+        self::assertSame(['modules-flexy-extension-demo-callout'], array_column($grouped['Modules'] ?? [], 'slug'));
+        self::assertSame(['Modules', 'Forms', 'Layouts'], \array_slice(array_keys($grouped), -3));
+    }
+
+    public function testAModuleStoryMayNotTakeTheSlugOfAStoryOnlyTheChildShips(): void
+    {
+        $this->childShips('components/Molecules/Card/toolkit.html.twig');
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('reuses the toolkit slug "molecules-card"');
+
+        $this->finderFor($this->childTemplate, $this->moduleStory('Molecules', 'Card'))->groupedComponents();
+    }
+
+    public function testAModuleStoryMayNotTakeTheSlugOfAStoryTheChildInherits(): void
+    {
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('reuses the toolkit slug "molecules-button"');
+
+        $this->finderFor($this->childTemplate, $this->moduleStory('Molecules', 'Button'))->groupedComponents();
+    }
+
     private function childShips(string $relativePath): void
     {
         (new Filesystem())->dumpFile($this->childTemplateDirectory.DS.$relativePath, '<div>child</div>');
@@ -217,8 +257,23 @@ final class StoryFinderTest extends TestCase
         return $stories;
     }
 
-    private function finderFor(string $frontTemplate): StoryFinder
+    private function finderFor(string $frontTemplate, StoryProviderInterface ...$moduleStories): StoryFinder
     {
-        return new StoryFinder(new FrontTemplateChain($frontTemplate));
+        return new StoryFinder(new FrontTemplateChain($frontTemplate), new ModuleStories($moduleStories));
+    }
+
+    /** A module that registers one story, whose template is never rendered here. */
+    private function moduleStory(string $category, string $name): StoryProviderInterface
+    {
+        return new class(new Story($category, $name, '@FlexyExtensionDemoModule/toolkit/Callout.html.twig', __FILE__)) implements StoryProviderInterface {
+            public function __construct(private readonly Story $story)
+            {
+            }
+
+            public function stories(): array
+            {
+                return [$this->story];
+            }
+        };
     }
 }

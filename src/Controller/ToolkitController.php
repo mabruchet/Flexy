@@ -120,7 +120,6 @@ class ToolkitController extends AbstractController
         return $response;
     }
 
-
     /**
      * Flattens everything into one slug-indexed map, so every page resolves the same way. A
      * section page carries no `path`, so none of them offers its source.

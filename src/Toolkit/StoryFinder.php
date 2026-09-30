@@ -27,6 +27,9 @@ use Symfony\Component\Finder\SplFileInfo;
  * plain list of story path => status: the nearest template that names a path answers for it,
  * and ComponentStatus::of() answers for the paths none of them names. A child template says
  * where its stories — and Flexy's — stand without editing Flexy.
+ *
+ * The stories the active modules register come after those of the chain, under the same
+ * categories or under their own.
  */
 final readonly class StoryFinder
 {
@@ -44,6 +47,7 @@ final readonly class StoryFinder
 
     public function __construct(
         private FrontTemplateChain $templateChain,
+        private ModuleStories $moduleStories,
     ) {
     }
 
@@ -90,6 +94,27 @@ final readonly class StoryFinder
             usort($stories, static fn (array $left, array $right): int => strcmp($left['slug'], $right['slug']));
         }
         unset($stories);
+
+        // After the sort, so a module story keeps the place its provider gives it. A module slug
+        // that a story of the chain already owns would shadow it, whichever template ships that
+        // story, so it stops the page rather than one of the two going missing.
+        $templateSlugs = [];
+
+        foreach ($grouped as $stories) {
+            foreach ($stories as $story) {
+                $templateSlugs[$story['slug']] = true;
+            }
+        }
+
+        foreach ($this->moduleStories->grouped() as $category => $stories) {
+            foreach ($stories as $story) {
+                if (isset($templateSlugs[$story['slug']])) {
+                    throw new \LogicException(\sprintf('The module story "%s" reuses the toolkit slug "%s" of a theme story.', $story['name'], $story['slug']));
+                }
+
+                $grouped[$category][] = $story;
+            }
+        }
 
         foreach (self::TRAILING_CATEGORIES as $category) {
             if (isset($grouped[$category])) {
