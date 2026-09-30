@@ -481,3 +481,7 @@ Accept the required terms to continue.: Accept the required terms to continue.
 Accept the privacy policy to continue.: Accept the privacy policy to continue.
 This form contains %count% errors.: This form contains %count% errors.
 This form contains one error.: This form contains one error.
+
+# Tag close button (components/Molecules/Tag/Base.html.twig)
+Remove: Remove
+"Remove %label%": Remove %label%

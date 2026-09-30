@@ -481,3 +481,16 @@ Accept the required terms to continue.: Acceptez les conditions obligatoires pou
 Accept the privacy policy to continue.: Acceptez la politique de confidentialité pour continuer.
 This form contains %count% errors.: Ce formulaire contient %count% erreurs.
 This form contains one error.: Ce formulaire contient une erreur.
+
+# Password reset
+This link cannot be used any more. Links expire shortly after they are sent, and can only be used once.: Ce lien n'est plus utilisable. Les liens expirent peu après leur envoi et ne servent qu'une seule fois.
+Ask for a new one and follow the link in the e-mail you receive.: Demandez-en un nouveau et suivez le lien contenu dans l'e-mail que vous recevrez.
+Ask for a new link: Demander un nouveau lien
+Choose the password you will use from now on.: Choisissez le mot de passe que vous utiliserez désormais.
+Confirm your new password: Confirmez votre nouveau mot de passe
+Your new password: Votre nouveau mot de passe
+Your new password again: Répétez votre nouveau mot de passe
+
+# Tag close button (components/Molecules/Tag/Base.html.twig)
+Remove: Retirer
+"Remove %label%": Retirer %label%
