@@ -54,6 +54,7 @@ class Checkout
             'discounts' => $this->readDiscounts(),
             'coupons' => $this->attributeAccessService->attributeCoupon('coupon_list'),
             'invoice_vat_number' => $this->attributeAccessService->attributeCart('invoice_vat_number'),
+            'vat_exemption_state' => $this->attributeAccessService->attributeCart('vat_exemption_state'),
         ];
     }
 

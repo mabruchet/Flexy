@@ -92,6 +92,15 @@
                     {{ 'included'|trans }}
                 </div>
             {% endif %}
+            {% if summary.vat_exemption_state == 'verification_expired' %}
+                <div class="italic">
+                    {{ 'The verification of VAT number %number% has expired: the order is no longer exempted from VAT.'|trans({'%number%': summary.invoice_vat_number}) }}
+                </div>
+            {% elseif summary.vat_exemption_state == 'not_verified' %}
+                <div class="italic">
+                    {{ 'VAT number %number% is not verified: the order is not exempted from VAT.'|trans({'%number%': summary.invoice_vat_number}) }}
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>

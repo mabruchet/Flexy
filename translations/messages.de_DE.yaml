@@ -499,3 +499,5 @@ Remove: Entfernen
 # VAT exemption (Summary/Checkout, Summary/Order, AddressCard)
 VAT verified on %date%: USt-IdNr. geprüft am %date%
 VAT exempted (reverse charge), buyer VAT number %number%: 'Steuerfrei (Reverse-Charge), USt-IdNr. des Käufers: %number%'
+'The verification of VAT number %number% has expired: the order is no longer exempted from VAT.': 'Die Prüfung der USt-IdNr. %number% ist abgelaufen: Die Bestellung ist nicht mehr von der Mehrwertsteuer befreit.'
+'VAT number %number% is not verified: the order is not exempted from VAT.': 'Die USt-IdNr. %number% ist nicht geprüft: Die Bestellung ist nicht von der Mehrwertsteuer befreit.'
