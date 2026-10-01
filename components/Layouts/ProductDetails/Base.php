@@ -31,6 +31,8 @@ use Thelia\Api\Service\DataAccess\ProductSaleElementsAccessService;
 use Thelia\Core\Form\FormServiceInterface;
 use Thelia\Domain\Cart\CartFacade;
 use Thelia\Domain\Cart\DTO\CartItemAddDTO;
+use Thelia\Domain\Cart\Exception\InvalidCartException;
+use Thelia\Domain\Cart\Exception\NotEnoughStockException;
 use Thelia\Form\Definition\FrontForm;
 use Thelia\Model\ConfigQuery;
 
@@ -117,6 +119,15 @@ class Base
      */
     #[LiveProp]
     public ?array $runningSaleTag = null;
+
+    /**
+     * Set when the cart refused the last add: a module rule (an InvalidCartException thrown by a
+     * CART_ADDITEM listener) or the stock that ran out since the page was rendered. A plain
+     * property, not a LiveProp: it belongs to the response of the action that failed, and the next
+     * action renders without it. The message is the theme's own, never the exception's: a module's
+     * message is not written for the shopper.
+     */
+    public bool $cartRefused = false;
 
     private ?array $pses = null;
 
@@ -273,16 +284,24 @@ class Base
         $this->submitForm();
         $formData = $this->getForm()->getData();
 
-        $this->cartFacade->addItem(
-            new CartItemAddDTO(
-                cart: $this->cartFacade->getOrCreateFromSession(),
-                productId: (int) $formData['product'],
-                productSaleElementId: (int) $formData['product_sale_elements_id'],
-                quantity: (int) $formData['quantity'],
-                append: (bool) $formData['append'],
-                newness: (bool) $formData['newness'],
-            )
-        );
+        // A refusal of the cart is the shopper's business, not a server error: without this the
+        // live request answered 500 and the selector stayed as it was, with no word of why.
+        try {
+            $this->cartFacade->addItem(
+                new CartItemAddDTO(
+                    cart: $this->cartFacade->getOrCreateFromSession(),
+                    productId: (int) $formData['product'],
+                    productSaleElementId: (int) $formData['product_sale_elements_id'],
+                    quantity: (int) $formData['quantity'],
+                    append: (bool) $formData['append'],
+                    newness: (bool) $formData['newness'],
+                )
+            );
+        } catch (InvalidCartException|NotEnoughStockException) {
+            $this->cartRefused = true;
+
+            return;
+        }
 
         $this->emit('addToCart', ['values' => $this->formValues]);
         $this->emit(CheckoutEvents::ADD_ITEM_EVENT);
