@@ -499,3 +499,4 @@ VAT verified on %date%: VAT verified on %date%
 VAT exempted (reverse charge), buyer VAT number %number%: VAT exempted (reverse charge), buyer VAT number %number%
 'The verification of VAT number %number% has expired: the order is no longer exempted from VAT.': 'The verification of VAT number %number% has expired: the order is no longer exempted from VAT.'
 'VAT number %number% is not verified: the order is not exempted from VAT.': 'VAT number %number% is not verified: the order is not exempted from VAT.'
+"The stock of %reference% ran out while your order was placed. Please adjust your cart.": "The stock of %reference% ran out while your order was placed. Please adjust your cart."

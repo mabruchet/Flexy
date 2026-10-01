@@ -17,6 +17,7 @@ namespace FlexyBundle\Controller;
 use FlexyBundle\Service\CartStockService;
 use FlexyBundle\Service\CheckoutModuleStepScreen;
 use FlexyBundle\Service\CheckoutStepRouteResolver;
+use FlexyBundle\Service\CheckoutStockRefusal;
 use FlexyBundle\Service\CheckoutTrail;
 use FlexyBundle\Service\GuestCheckoutGate;
 use FlexyBundle\Service\GuestOrderTracking;
@@ -40,6 +41,7 @@ use Thelia\Domain\Checkout\Exception\MissingAddressException;
 use Thelia\Domain\Checkout\Exception\MissingConsentException;
 use Thelia\Domain\Checkout\Service\CheckoutProgressionService;
 use Thelia\Domain\Customer\Service\AuthenticationReturnUrl;
+use Thelia\Domain\Order\Exception\StockShortageException;
 use Thelia\Model\Cart;
 use Thelia\Model\CheckoutStep;
 use Thelia\Model\Order;
@@ -255,6 +257,7 @@ class CheckoutController extends FlexyController
         CartFacade $cartFacade,
         CheckoutFacade $checkoutFacade,
         CartStockService $cartStockService,
+        CheckoutStockRefusal $stockRefusal,
         GuestCheckoutGate $guestCheckoutGate,
         GuestOrderTracking $guestOrderTracking,
         CheckoutStepRouteResolver $routes,
@@ -316,6 +319,9 @@ class CheckoutController extends FlexyController
             throw new RedirectException($this->generateUrl($guestCheckoutGate->entryPointRoute()), Response::HTTP_FOUND, $this->translator->trans('This order can no longer be placed without an account. Please sign in or create one.'));
         } catch (EmptyCartException $e) {
             throw new RedirectException($routes->pathFor(CheckoutStep::CODE_CART), Response::HTTP_FOUND, $e->getMessage());
+        } catch (StockShortageException $e) {
+            // The pre-check above covers the stock read before the placement; this one is the stock lost during it.
+            throw $stockRefusal->answer($e, $routes->pathFor(CheckoutStep::CODE_CART), $this->getRequest()->getSession());
         } catch (MissingAddressException|InvalidDeliveryException|IncompleteInvoiceAddressException|MissingConsentException $e) {
             // The rule, not the greyed-out button: a request that reaches here without a
             // carrier, without the legal identifiers of a business invoice or without the
