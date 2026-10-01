@@ -105,6 +105,16 @@ A module's `templates/` directory is registered by the core as the `@{Code}Modul
 
 Mind the stylesheet: `assets/styles/app.css` limits the Tailwind scan to the theme's own files, so a utility class used only in a module template is never compiled. Build a module component out of the theme's components and classes.
 
+### Giving a checkout step of a module a screen
+
+A step declared through `CheckoutStepProviderInterface` is served by this theme when its `componentName()` names a
+Twig or Live component: `GET /checkout/step/{code}` (route `checkout_step`, `code` in lower case, digits and
+underscores, the code the provider answers) renders `checkout-step.html.twig` with that component in the frame of the
+tunnel, with the previous and next links of the configured order. The step is reachable only once the steps before it are
+settled; otherwise the buyer is sent back to the first incomplete step that has a screen. A step that names no component
+has no screen: the navigation walks past it, its check still applies at the placement. On a one-page checkout the route
+redirects, every step being on the cart page.
+
 ## Deploying
 
 Check that your web server serves `.webmanifest` as `application/manifest+json`. Once the
