@@ -28,12 +28,12 @@ final class CheckoutModuleStepScreenTest extends TestCase
 
     public function testACoreStepHasItsOwnScreen(): void
     {
-        self::assertTrue(new CheckoutModuleStepScreen()->hasScreen(self::step('delivery', null), self::CORE));
+        self::assertTrue((new CheckoutModuleStepScreen())->hasScreen(self::step('delivery', null), self::CORE));
     }
 
     public function testAModuleStepNamingItsComponentHasAScreen(): void
     {
-        self::assertTrue(new CheckoutModuleStepScreen()->hasScreen(self::step('loyalty_redeem', 'Loyalty:Redeem'), self::CORE));
+        self::assertTrue((new CheckoutModuleStepScreen())->hasScreen(self::step('loyalty_redeem', 'Loyalty:Redeem'), self::CORE));
     }
 
     public function testAModuleStepWithoutComponentHasNoScreen(): void
@@ -57,7 +57,7 @@ final class CheckoutModuleStepScreenTest extends TestCase
     {
         $steps = [self::step('cart', null), self::step('delivery', null), self::step('gift', null), self::step('loyalty', 'Loyalty:Redeem'), self::step('payment', null), self::step('confirmation', null)];
 
-        self::assertSame(['cart', 'delivery', 'loyalty', 'payment', 'confirmation'], new CheckoutModuleStepScreen()->navigableCodes($steps, self::CORE));
+        self::assertSame(['cart', 'delivery', 'loyalty', 'payment', 'confirmation'], (new CheckoutModuleStepScreen())->navigableCodes($steps, self::CORE));
     }
 
     public function testAFirstIncompleteStepWithoutScreenLandsOnTheLastStepBeforeItThatHasOne(): void
@@ -65,22 +65,22 @@ final class CheckoutModuleStepScreenTest extends TestCase
         $steps = [self::step('cart', null), self::step('delivery', null), self::step('gift', null), self::step('payment', null)];
 
         // No redirect loop: the buyer is not sent to "gift" (no screen), and "delivery" is a screen of its own.
-        self::assertSame('delivery', new CheckoutModuleStepScreen()->landingFor('gift', $steps, self::CORE, 'cart'));
+        self::assertSame('delivery', (new CheckoutModuleStepScreen())->landingFor('gift', $steps, self::CORE, 'cart'));
     }
 
     public function testAStepWithoutScreenAheadOfEveryOtherLandsOnTheFallback(): void
     {
         $steps = [self::step('gift', null), self::step('cart', null)];
 
-        self::assertSame('cart', new CheckoutModuleStepScreen()->landingFor('gift', $steps, self::CORE, 'cart'));
-        self::assertSame('cart', new CheckoutModuleStepScreen()->landingFor('unknown', $steps, self::CORE, 'cart'));
+        self::assertSame('cart', (new CheckoutModuleStepScreen())->landingFor('gift', $steps, self::CORE, 'cart'));
+        self::assertSame('cart', (new CheckoutModuleStepScreen())->landingFor('unknown', $steps, self::CORE, 'cart'));
     }
 
     public function testAStepWithAScreenLandsOnItself(): void
     {
         $steps = [self::step('cart', null), self::step('loyalty', 'Loyalty:Redeem')];
 
-        self::assertSame('loyalty', new CheckoutModuleStepScreen()->landingFor('loyalty', $steps, self::CORE, 'cart'));
+        self::assertSame('loyalty', (new CheckoutModuleStepScreen())->landingFor('loyalty', $steps, self::CORE, 'cart'));
     }
 
     public function testTheRouteOfAStepIsItsCoreRouteTheSharedRouteOrTheEntryRoute(): void
