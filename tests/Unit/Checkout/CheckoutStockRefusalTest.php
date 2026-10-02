@@ -39,7 +39,7 @@ final class CheckoutStockRefusalTest extends TestCase
     {
         $session = new Session(new MockArraySessionStorage());
 
-        $redirect = new CheckoutStockRefusal(new IdentityTranslator())->answer(new StockShortageException('REF-1'), '/checkout/cart', $session);
+        $redirect = (new CheckoutStockRefusal(new IdentityTranslator()))->answer(new StockShortageException('REF-1'), '/checkout/cart', $session);
 
         self::assertSame('/checkout/cart', $redirect->getUrl());
         self::assertSame(302, $redirect->getStatusCode());
@@ -50,7 +50,7 @@ final class CheckoutStockRefusalTest extends TestCase
     {
         $session = new Session(new MockArraySessionStorage());
 
-        new CheckoutStockRefusal(new IdentityTranslator())->answer(new StockShortageException(), '/checkout/cart', $session);
+        (new CheckoutStockRefusal(new IdentityTranslator()))->answer(new StockShortageException(), '/checkout/cart', $session);
 
         self::assertSame(['Some products in your cart are no longer available in the requested quantity. Please adjust the quantities before ordering.'], $session->getFlashBag()->get('error'));
     }
@@ -59,7 +59,7 @@ final class CheckoutStockRefusalTest extends TestCase
     {
         $session = new Session(new MockArraySessionStorage());
 
-        $redirect = new CheckoutStockRefusal(new IdentityTranslator())->answer(new StockShortageException('REF-1'), '/checkout/cart', $session);
+        $redirect = (new CheckoutStockRefusal(new IdentityTranslator()))->answer(new StockShortageException('REF-1'), '/checkout/cart', $session);
 
         self::assertStringNotContainsString('Not enough stock', (string) $redirect->getMessage());
         self::assertStringNotContainsString('Not enough stock', implode('', $session->getFlashBag()->get('error')));
