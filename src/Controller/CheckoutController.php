@@ -47,6 +47,7 @@ use Thelia\Domain\Order\Exception\StockShortageException;
 use Thelia\Model\Cart;
 use Thelia\Model\CheckoutStep;
 use Thelia\Model\Order;
+use Thelia\Model\OrderQuery;
 
 /**
  * The checkout, as the shop configured it.
@@ -398,6 +399,7 @@ class CheckoutController extends FlexyController
             'current' => CheckoutStep::CODE_CONFIRMATION,
             'steps' => $steps,
             'guest_order_token' => $guestOrderToken,
+            'placed_order' => $this->orderPlacedBy($session, $placedOrderMemory),
         ]);
     }
 
@@ -517,6 +519,41 @@ class CheckoutController extends FlexyController
             'customer_login',
             [AuthenticationReturnUrl::PARAMETER => $this->getRequest()->getRequestUri()],
         ));
+    }
+
+    /**
+     * The order this session has just placed, for the confirmation page to show it: its
+     * reference, its amount, its payment mode, and what the payment module has to say about
+     * it (a cheque to send, a bank account to transfer to).
+     *
+     * Read from the session, never from the address of the page. A signed-in customer
+     * only ever gets an order of their own: a browser that changed hands without signing
+     * out — someone signing in over a guest who placed an order — gets nothing rather
+     * than somebody else's order.
+     *
+     * @throws PropelException
+     */
+    private function orderPlacedBy(Session $session, PlacedOrderMemory $placedOrderMemory): ?Order
+    {
+        $orderId = $placedOrderMemory->placedOrderId();
+
+        if (null === $orderId) {
+            return null;
+        }
+
+        $order = OrderQuery::create()->findPk($orderId);
+
+        if (null === $order) {
+            return null;
+        }
+
+        $customer = $session->getCustomerUser();
+
+        if (null !== $customer && (int) $order->getCustomerId() !== (int) $customer->getId()) {
+            return null;
+        }
+
+        return $order;
     }
 
     /**
