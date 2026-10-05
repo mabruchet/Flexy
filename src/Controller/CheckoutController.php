@@ -266,9 +266,7 @@ class CheckoutController extends FlexyController
         CartStockService $cartStockService,
         CheckoutStockRefusal $stockRefusal,
         GuestCheckoutGate $guestCheckoutGate,
-        GuestOrderTracking $guestOrderTracking,
         CheckoutStepRouteResolver $routes,
-        CheckoutTrail $trail,
     ): Response {
         $cart = $cartFacade->getCartFromSession();
 
@@ -311,13 +309,12 @@ class CheckoutController extends FlexyController
                 return $response;
             }
 
-            return $this->render('checkout-confirm', [
-                'current' => CheckoutStep::CODE_CONFIRMATION,
-                // The cart was emptied by the placement a few lines ago: the bar is the
-                // one the order was placed through, not the one an empty cart describes.
-                'steps' => $trail->ofTheOrderJustPlaced(),
-                'guest_order_token' => $guestOrderTracking->tokenOfPlacedOrder(),
-            ]);
+            // A payment that needs no gateway (a cheque, a bank transfer, a gift card
+            // covering everything) is confirmed on the confirmation page itself, by a
+            // redirection: the core keeps the cart of an order until it is paid, and only
+            // that page lets it go. Rendered here, the cart stayed full after the order,
+            // and reloading the page placed the same order a second time.
+            return $this->generateRedirect($this->generateUrl('checkout_confirm'));
         } catch (GuestCheckoutNotAllowedException) {
             // The shop's answer changed while the buyer was in the checkout: the setting
             // was turned off, or the cart gained a product that requires an account. Back
