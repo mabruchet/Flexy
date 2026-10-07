@@ -409,11 +409,13 @@ class CheckoutController extends FlexyController
         Request $request,
         GuestOrderTracking $guestOrderTracking,
         CheckoutTrail $trail,
+        PlacedOrderMemory $placedOrderMemory,
     ): Response {
         $order = $this->cancelFailedOrder(
             $checkoutFacade,
             $request->query->getInt('order_id'),
             $guestOrderTracking->tokenOfPlacedOrder(),
+            $placedOrderMemory,
         );
 
         return $this->render('checkout-failed', [
@@ -573,13 +575,20 @@ class CheckoutController extends FlexyController
      * waiting for its payment — a gateway returning twice, a page refreshed, or a late
      * confirmation crossing a failure return. None of them is a server error, and none of
      * them may take the failure page down with it.
+     *
+     * Only the order this session has just placed is cancelled. The page is a plain GET
+     * anybody can be sent to with any number in it, and the customer an order names may
+     * have others waiting for their money — a cheque in the post, a bank transfer — which
+     * a link must not cancel. A return that lost its session cancels nothing: the order
+     * stays waiting for its payment, as the gateway left it.
      */
     private function cancelFailedOrder(
         CheckoutFacade $checkoutFacade,
         int $orderId,
         ?string $guestOrderToken,
+        PlacedOrderMemory $placedOrderMemory,
     ): ?Order {
-        if ($orderId <= 0) {
+        if ($orderId <= 0 || $orderId !== $placedOrderMemory->placedOrderId()) {
             return null;
         }
 
