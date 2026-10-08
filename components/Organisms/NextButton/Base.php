@@ -55,6 +55,11 @@ use Thelia\Model\CheckoutStep;
  * an empty cart, a billing address missing its legal identifiers, a consent that has not
  * been given — so that the rule the order is refused by is the rule the button greys out
  * on, written in one place instead of two.
+ *
+ * The exception is a step a module declared: what it waits for is the module's own code,
+ * which the button can not know to be cheap. Its provider's check() is asked, at most once
+ * per instance and so once per render, whatever the number of times the template reads the
+ * state of the button.
  */
 #[AsLiveComponent]
 class Base
@@ -68,6 +73,9 @@ class Base
 
     #[LiveProp(updateFromParent: true)]
     public string $href;
+
+    /** @var array{valid: bool, reason: ?string}|null */
+    private ?array $verdict = null;
 
     /**
      * @param iterable<CheckoutStepProviderInterface> $stepProviders the steps modules declare, asked whether this cart
@@ -98,35 +106,7 @@ class Base
     #[LiveListener('updateNextButton')]
     public function getIsValid(): bool
     {
-        try {
-            $cart = $this->cartFacade->getOrCreateFromSession();
-
-            // Reading the tunnel runs no check of its own: it asks each step whether this
-            // cart skips it, which for the delivery is "has it anything to ship".
-            $codes = array_map(
-                static fn (CheckoutStepView $step): string => $step->code,
-                $this->progression->activeSteps($cart),
-            );
-
-            $here = array_search($this->step, $codes, true);
-
-            if (false === $here) {
-                return false;
-            }
-
-            foreach (\array_slice($codes, 0, $here + 1) as $code) {
-                if (!$this->isSettled($cart, $code)) {
-                    return false;
-                }
-            }
-
-            return true;
-        } catch (PropelException) {
-            // The checks read the cart, its addresses and the consents. A button left
-            // grey is a far better outcome than a 500 swallowing the whole step, and the
-            // order is refused a moment later by the very same rules.
-            return false;
-        }
+        return $this->verdict()['valid'];
     }
 
     /**
@@ -142,9 +122,33 @@ class Base
      */
     public function getDisabledReason(): ?string
     {
+        return $this->verdict()['reason'];
+    }
+
+    /**
+     * The state of the button, worked out once per instance. The template asks for it
+     * several times per render (the button, its link, the sentence under it), and the
+     * check of a step a module declared is that module's code, possibly a query or a call
+     * out: it must not run once per question. An instance lives for one render, so the
+     * answer never outlives the cart it was computed on.
+     *
+     * @return array{valid: bool, reason: ?string}
+     */
+    private function verdict(): array
+    {
+        return $this->verdict ??= $this->judge();
+    }
+
+    /**
+     * @return array{valid: bool, reason: ?string}
+     */
+    private function judge(): array
+    {
         try {
             $cart = $this->cartFacade->getOrCreateFromSession();
 
+            // Reading the tunnel runs no check of its own: it asks each step whether this
+            // cart skips it, which for the delivery is "has it anything to ship".
             $codes = array_map(
                 static fn (CheckoutStepView $step): string => $step->code,
                 $this->progression->activeSteps($cart),
@@ -153,18 +157,21 @@ class Base
             $here = array_search($this->step, $codes, true);
 
             if (false === $here) {
-                return null;
+                return ['valid' => false, 'reason' => null];
             }
 
             foreach (\array_slice($codes, 0, $here + 1) as $code) {
                 if (!$this->isSettled($cart, $code)) {
-                    return $this->reasonFor($cart, $code);
+                    return ['valid' => false, 'reason' => $this->reasonFor($cart, $code)];
                 }
             }
 
-            return null;
+            return ['valid' => true, 'reason' => null];
         } catch (PropelException) {
-            return null;
+            // The checks read the cart, its addresses and the consents. A button left
+            // grey is a far better outcome than a 500 swallowing the whole step, and the
+            // order is refused a moment later by the very same rules.
+            return ['valid' => false, 'reason' => null];
         }
     }
 

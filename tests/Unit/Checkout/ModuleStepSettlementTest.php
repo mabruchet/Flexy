@@ -16,7 +16,9 @@ namespace FlexyBundle\Tests\Unit\Checkout;
 
 use FlexyBundle\Service\ModuleStepSettlement;
 use PHPUnit\Framework\TestCase;
-use Thelia\Domain\Checkout\Exception\CheckoutException;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Thelia\Core\Translation\Translator;
+use Thelia\Domain\Checkout\Exception\MissingAddressException;
 use Thelia\Domain\Checkout\Service\Step\CheckoutStepProviderInterface;
 use Thelia\Model\Cart;
 
@@ -26,6 +28,12 @@ use Thelia\Model\Cart;
  */
 final class ModuleStepSettlementTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        // The refusals of the core translate their message, and read the translator through its singleton.
+        new Translator(new RequestStack());
+    }
+
     public function testAStepWhoseCheckPassesIsSettled(): void
     {
         self::assertTrue(ModuleStepSettlement::isSettled([$this->provider('phone', false)], new Cart(), 'phone'));
@@ -76,12 +84,7 @@ final class ModuleStepSettlementTest extends TestCase
             public function check(Cart $cart): void
             {
                 if ($this->refuses) {
-                    throw new class extends CheckoutException {
-                        public function __construct()
-                        {
-                            \RuntimeException::__construct('refused');
-                        }
-                    };
+                    throw new MissingAddressException();
                 }
             }
 
