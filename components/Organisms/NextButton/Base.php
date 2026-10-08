@@ -15,7 +15,9 @@ declare(strict_types=1);
 namespace FlexyBundle\Components\Organisms\NextButton;
 
 use FlexyBundle\Event\CheckoutEvents;
+use FlexyBundle\Service\ModuleStepSettlement;
 use Propel\Runtime\Exception\PropelException;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Symfony\UX\LiveComponent\Attribute\LiveListener;
 use Symfony\UX\LiveComponent\Attribute\LiveProp;
@@ -30,6 +32,7 @@ use Thelia\Domain\Checkout\Exception\MissingAddressException;
 use Thelia\Domain\Checkout\Exception\MissingConsentException;
 use Thelia\Domain\Checkout\Service\CheckoutProgressionService;
 use Thelia\Domain\Checkout\Service\ConsentGuard;
+use Thelia\Domain\Checkout\Service\Step\CheckoutStepProviderInterface;
 use Thelia\Model\Cart;
 use Thelia\Model\CheckoutStep;
 
@@ -66,11 +69,17 @@ class Base
     #[LiveProp(updateFromParent: true)]
     public string $href;
 
+    /**
+     * @param iterable<CheckoutStepProviderInterface> $stepProviders the steps modules declare, asked whether this cart
+     *                                                               passes theirs
+     */
     public function __construct(
         private readonly CartFacade $cartFacade,
         private readonly CheckoutProgressionService $progression,
         private readonly ConsentGuard $consentGuard,
         private readonly CartGuard $cartGuard,
+        #[AutowireIterator('thelia.checkout.step_provider')]
+        private readonly iterable $stepProviders = [],
     ) {
     }
 
@@ -207,10 +216,10 @@ class Base
             CheckoutStep::CODE_DELIVERY => null !== $cart->getAddressDeliveryId()
                 && null !== $cart->getDeliveryModuleId(),
             CheckoutStep::CODE_PAYMENT => $this->isPaymentSettled($cart),
-            // A step declared by a module: nothing here knows what it waits for, and a
-            // button this side of it must not be the thing that stops the buyer. What
-            // that step requires is still checked at the placement.
-            default => true,
+            // A step declared by a module: its provider knows what it waits for, and its
+            // check is the one the progression and the placement already ask. A step no
+            // provider declares any more is left to the placement.
+            default => ModuleStepSettlement::isSettled($this->stepProviders, $cart, $code),
         };
     }
 
