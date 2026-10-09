@@ -386,8 +386,9 @@ class CheckoutController extends FlexyController
 
         // Only for a session that actually placed an order. This page is reachable by
         // typing its url, and emptying the cart of someone halfway through the checkout
-        // would throw away what they had put in it. The core already empties the cart on
-        // the order itself, so there is nothing to lose by asking first.
+        // would throw away what they had put in it. The core keeps the cart of an order
+        // until that order is paid, so this is where the cart is let go, once the order
+        // is remembered.
         if ($placedOrderMemory->hasOne()) {
             $session->clearSessionCart($dispatcher);
         }
