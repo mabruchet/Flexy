@@ -56,10 +56,21 @@
         <div class="OrderCard-nbImages" aria-hidden="true"></div>
     </div>
 
-    <div class="mt-6 text-center md:text-start">
+    <div class="mt-6 flex flex-wrap justify-center gap-3 md:justify-start">
         <twig:Molecules:Button:Base
             text="{{ 'See order details'|trans }}"
             href="{{ path('account_order', {orderId: order.id}) }}"
         />
+        {% if this.trackingUrl %}
+            {% set trackLabel %}{{ 'Track my package'|trans }}<span class="sr-only"> {{ '(opens in a new tab)'|trans }}</span>{% endset %}
+            <twig:Molecules:Button:Base
+                :text="trackLabel"
+                href="{{ this.trackingUrl }}"
+                color="secondary"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="order-card-tracking-link"
+            />
+        {% endif %}
     </div>
 </div>
