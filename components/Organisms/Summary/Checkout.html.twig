@@ -1,12 +1,10 @@
-{# @prop showPromoCodeForm bool Renders the coupon form above the totals #}
-{% props showPromoCodeForm = true %}
 <div {{ attributes.defaults(stimulus_controller('live-refresh-on-focus')) }}>
     {% set summary = this.summary %}
     {% set coupons = summary.coupons ?? [] %}
     {% set discounts = summary.discounts %}
 
     <div class="Summary">
-        {% if showPromoCodeForm %}
+        {% if this.showPromoCodeForm %}
             <div class="mb-4">
                 <twig:Forms:PromoCode:Base />
             </div>
@@ -34,6 +32,17 @@
                     {% endif %}
                 </div>
             </div>
+            {% if summary.delivery_date %}
+                <div class="Summary-line" data-testid="summary-delivery-date">
+                    <div>{{ 'Delivery date'|trans }}</div>
+                    <div class="text-end">
+                        {{ summary.delivery_date.date|format_date('medium') }}
+                        {% if summary.delivery_date.start %}
+                            <br><span dir="ltr">{{ 'from %start% to %end%'|trans({'%start%': summary.delivery_date.start, '%end%': summary.delivery_date.end}) }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endif %}
             {# After the delivery, before the promotions: the order of a bill — what is
                bought, what it costs to send, what is added to it, then what comes off. #}
             {% if this.hasGiftWrapping %}
