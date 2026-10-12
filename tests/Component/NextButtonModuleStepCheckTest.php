@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace FlexyBundle\Tests\Component;
 
 use FlexyBundle\Components\Organisms\NextButton\Base;
+use FlexyBundle\Service\DeliveryDateBridge;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Storage\MockArraySessionStorage;
@@ -98,6 +99,7 @@ final class NextButtonModuleStepCheckTest extends KernelTestCase
             $progression,
             $container->get(ConsentGuard::class),
             $container->get(CartGuard::class),
+            $container->get(DeliveryDateBridge::class),
             [$provider],
         );
         $button->mount('phone', '/checkout/confirmation');

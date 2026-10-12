@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace FlexyBundle\Components\Organisms\NextButton;
 
 use FlexyBundle\Event\CheckoutEvents;
+use FlexyBundle\Service\DeliveryDateBridge;
 use FlexyBundle\Service\ModuleStepSettlement;
 use Propel\Runtime\Exception\PropelException;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
@@ -86,6 +87,7 @@ class Base
         private readonly CheckoutProgressionService $progression,
         private readonly ConsentGuard $consentGuard,
         private readonly CartGuard $cartGuard,
+        private readonly DeliveryDateBridge $deliveryDates,
         #[AutowireIterator('thelia.checkout.step_provider')]
         private readonly iterable $stepProviders = [],
     ) {
@@ -182,9 +184,11 @@ class Base
     {
         return match ($code) {
             CheckoutStep::CODE_CART => 'cart_empty',
-            CheckoutStep::CODE_DELIVERY => null === $cart->getAddressDeliveryId()
-                ? 'delivery_address'
-                : 'delivery_module',
+            CheckoutStep::CODE_DELIVERY => match (true) {
+                null === $cart->getAddressDeliveryId() => 'delivery_address',
+                null === $cart->getDeliveryModuleId() => 'delivery_module',
+                default => 'delivery_date',
+            },
             CheckoutStep::CODE_PAYMENT => $this->paymentReason($cart),
             default => null,
         };
@@ -221,7 +225,9 @@ class Base
         return match ($code) {
             CheckoutStep::CODE_CART => $this->hasSomethingInIt($cart),
             CheckoutStep::CODE_DELIVERY => null !== $cart->getAddressDeliveryId()
-                && null !== $cart->getDeliveryModuleId(),
+                && null !== $cart->getDeliveryModuleId()
+                // The day the carrier asks for, judged by the same guard as the placement.
+                && $this->deliveryDates->isSettled($cart),
             CheckoutStep::CODE_PAYMENT => $this->isPaymentSettled($cart),
             // A step declared by a module: its provider knows what it waits for, and its
             // check is the one the progression and the placement already ask. A step no
