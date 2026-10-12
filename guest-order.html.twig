@@ -3,7 +3,8 @@
 {# The order this page shows is the one the link named, and nothing else: the controller
    never queries by customer, so there is no other order to reach from here. #}
 {% set statusCode = order.orderStatus.code %}
-{% set isClosed = statusCode in ['canceled', 'refunded'] %}
+{# A custom status declared equivalent to "canceled" or "refunded" closes the order too. #}
+{% set isClosed = (order.orderStatus.equivalentCode|default(null) ?: statusCode) in ['canceled', 'refunded'] %}
 {# Plain text for the <title>; the visible heading isolates the reference - see the <h1> below. #}
 {% set heading = 'Order N°'|trans ~ ' ' ~ order.ref %}
 
@@ -21,6 +22,7 @@
             <twig:Organisms:DeliveryTracking:Base
                 statusCode="{{ statusCode }}"
                 trackingRef="{{ order.deliveryRef }}"
+                :trackLink="order.deliveryTrackingUrl|default(null)"
             />
         {% endif %}
 
@@ -42,6 +44,14 @@
         <hr class="my-10" />
 
         <h2 class="h4 mb-6">{{ 'Delivery & payment'|trans }}</h2>
+        {% if order.deliveryDate is defined and order.deliveryDate %}
+            <p class="paragraph-3 mb-4" data-testid="order-delivery-date">
+                {{ 'Requested delivery'|trans }}: <strong>{{ order.deliveryDate|format_date('full') }}</strong>
+                {% if order.deliverySlotStart is defined and order.deliverySlotStart %}
+                    <span dir="ltr">{{ 'from %start% to %end%'|trans({'%start%': order.deliverySlotStart, '%end%': order.deliverySlotEnd ?? ''}) }}</span>
+                {% endif %}
+            </p>
+        {% endif %}
         <div class="flex flex-col gap-2">
             <twig:Organisms:AddressCard:Base
                 :addressId="order.deliveryOrderAddress.id"
