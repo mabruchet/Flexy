@@ -420,7 +420,7 @@ class CheckoutController extends FlexyController
         Request $request,
         GuestOrderTracking $guestOrderTracking,
         CheckoutTrail $trail,
-        PlacedOrderMemory $placedOrderMemory,
+        ?PlacedOrderMemory $placedOrderMemory = null,
     ): Response {
         $order = $this->cancelFailedOrder(
             $checkoutFacade,
@@ -592,14 +592,23 @@ class CheckoutController extends FlexyController
      * have others waiting for their money — a cheque in the post, a bank transfer — which
      * a link must not cancel. A return that lost its session cancels nothing: the order
      * stays waiting for its payment, as the gateway left it.
+     *
+     * The session proves it placed the order in either of two ways: the order it
+     * remembers placing, or the tracking token a guest was handed at the placement. The
+     * token names one order only, and the core cancellation refuses any other, so it
+     * cannot reach an order of somebody else nor another one of the same buyer.
      */
     private function cancelFailedOrder(
         CheckoutFacade $checkoutFacade,
         int $orderId,
         ?string $guestOrderToken,
-        PlacedOrderMemory $placedOrderMemory,
+        ?PlacedOrderMemory $placedOrderMemory,
     ): ?Order {
-        if ($orderId <= 0 || $orderId !== $placedOrderMemory->placedOrderId()) {
+        if ($orderId <= 0) {
+            return null;
+        }
+
+        if (null === $guestOrderToken && $orderId !== $placedOrderMemory?->placedOrderId()) {
             return null;
         }
 
