@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace FlexyBundle\Components\Organisms\Summary;
 
 use FlexyBundle\Event\CheckoutEvents;
+use FlexyBundle\Service\DeliveryDateBridge;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Symfony\UX\LiveComponent\Attribute\LiveListener;
 use Symfony\UX\LiveComponent\Attribute\LiveProp;
@@ -22,6 +23,8 @@ use Symfony\UX\LiveComponent\ComponentToolsTrait;
 use Symfony\UX\LiveComponent\DefaultActionTrait;
 use Thelia\Action\Coupon;
 use Thelia\Api\Service\DataAccess\AttributeAccessService;
+use Thelia\Domain\Cart\CartFacade;
+use Thelia\Domain\Localization\Service\LangService;
 
 #[AsLiveComponent]
 class Checkout
@@ -43,6 +46,9 @@ class Checkout
     public function __construct(
         private readonly AttributeAccessService $attributeAccessService,
         private readonly Coupon $coupon,
+        private readonly DeliveryDateBridge $deliveryDates,
+        private readonly CartFacade $cartFacade,
+        private readonly LangService $langService,
     ) {
     }
 
@@ -66,6 +72,7 @@ class Checkout
             'taxed_discount' => $this->attributeAccessService->attributeCart('taxed_discount'),
             'discount' => $this->attributeAccessService->attributeCart('discount'),
             'gift_wrapping_title' => $this->attributeAccessService->attributeCart('gift_wrapping_title'),
+            'delivery_date' => $this->deliveryDates->chosenOn($this->cartFacade->getOrCreateFromSession(), $this->langService->getLocale()),
             'taxed_gift_wrapping' => $this->attributeAccessService->attributeCart('taxed_gift_wrapping'),
             'discounts' => $this->readDiscounts(),
             'coupons' => $this->attributeAccessService->attributeCoupon('coupon_list'),
