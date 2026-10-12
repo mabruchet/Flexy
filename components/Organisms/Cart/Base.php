@@ -368,7 +368,7 @@ class Base
             cartItemId: $line->getId(),
         ));
         $this->emit(CheckoutEvents::DELETE_ITEM_EVENT);
-        $this->dispatchQuantityChange($match->productSaleElementsId, -$match->quantity);
+        $this->dispatchQuantityChange((int) $line->getProductSaleElementsId(), -(int) $line->getQuantity());
     }
 
     #[LiveAction]
