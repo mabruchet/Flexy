@@ -29,6 +29,17 @@ final class CheckoutEvents
     public const ADD_ITEM_EVENT = 'CART_ADD_ITEM_EVENT';
     public const DELETE_ITEM_EVENT = 'CART_DELETE_ITEM_EVENT';
     public const SET_DELIVERY_MODULE_OPTION = 'SET_DELIVERY_MODULE_OPTION';
+
+    /**
+     * Emitted by the delivery step once the carrier is written on the cart, for the cards
+     * that show which carrier is selected.
+     */
+    public const DELIVERY_MODULE_OPTION_SAVED = 'DELIVERY_MODULE_OPTION_SAVED';
+
+    /**
+     * Emitted by the delivery date picker once a day, or a slot, is written on the cart.
+     */
+    public const DELIVERY_DATE_CHOSEN = 'DELIVERY_DATE_CHOSEN';
     public const SET_PAYMENT_MODULE_ID = 'SET_PAYMENT_MODULE_ID';
     public const SET_DELIVERY_ORDER_ADDRESS_ID = 'SET_DELIVERY_ORDER_ADDRESS_ID';
     public const SET_INVOICE_ORDER_ADDRESS_ID = 'SET_INVOICE_ORDER_ADDRESS_ID';
@@ -38,4 +49,13 @@ final class CheckoutEvents
     public const REMOVE_INVOICE_ORDER_ADDRESS_ID = 'REMOVE_INVOICE_ORDER_ADDRESS_ID';
     public const DELETE_DELIVERY_ADDRESS = 'DELETE_DELIVERY_ADDRESS';
     public const ADD_PROMO_CODE = 'ADD_PROMO_CODE';
+
+    /**
+     * Plain DOM events, not LiveComponent ones: dispatched on the root element of the component once a cart change went
+     * through, they bubble to `document` and carry `{pse: <product sale element id>, quantity: <quantity added or removed>}`.
+     * They are what analytics scripts listen to (the GoogleTagManager module's `addToCart.js` is one); nothing in the theme
+     * itself depends on them. Never dispatched for a change the cart refused.
+     */
+    public const BROWSER_ADD_PSE = 'addPseToCart';
+    public const BROWSER_REMOVE_PSE = 'removePseFromCart';
 }

@@ -265,6 +265,10 @@ class Base
         // Quantity already updated on the DTO by the data-model binding.
         $newQuantity = $cartItem->quantity;
 
+        // The actions below tell the page what the line gained or lost, from the quantity the line holds: put back the one
+        // it had before the binding wrote the new one.
+        $cartItem->quantity = $baseQuantity;
+
         if ($newQuantity <= 0) {
             $this->remove($index);
 
@@ -309,6 +313,7 @@ class Base
             quantity: $newQuantity,
         ));
         $this->emit(CheckoutEvents::UPDATE_ITEM_QUANTITY_EVENT);
+        $this->dispatchQuantityChange($cartItem->productSaleElementsId, $newQuantity - $cartItem->quantity);
     }
 
     #[LiveAction]
@@ -329,6 +334,7 @@ class Base
             quantity: $newQuantity,
         ));
         $this->emit(CheckoutEvents::UPDATE_ITEM_QUANTITY_EVENT);
+        $this->dispatchQuantityChange($cartItem->productSaleElementsId, $newQuantity - $cartItem->quantity);
     }
 
     #[LiveAction]
@@ -362,6 +368,7 @@ class Base
             cartItemId: $line->getId(),
         ));
         $this->emit(CheckoutEvents::DELETE_ITEM_EVENT);
+        $this->dispatchQuantityChange($match->productSaleElementsId, -$match->quantity);
     }
 
     #[LiveAction]
@@ -408,6 +415,23 @@ class Base
         $this->pendingDelete = null;
 
         $this->emit(CheckoutEvents::ADD_ITEM_EVENT, ['pseId' => $pseId]);
+        $this->dispatchQuantityChange($pseId, $quantity ?? 1);
+    }
+
+    /**
+     * Tells the page, through a DOM event, what the line just gained or lost (CheckoutEvents::BROWSER_ADD_PSE and
+     * BROWSER_REMOVE_PSE). A change of nothing is not told.
+     */
+    protected function dispatchQuantityChange(int $pseId, int $difference): void
+    {
+        if (0 === $difference) {
+            return;
+        }
+
+        $this->dispatchBrowserEvent(
+            $difference > 0 ? CheckoutEvents::BROWSER_ADD_PSE : CheckoutEvents::BROWSER_REMOVE_PSE,
+            ['pse' => $pseId, 'quantity' => abs($difference)],
+        );
     }
 
     private function isShortOfStock(int $pseId, int $quantity): bool
