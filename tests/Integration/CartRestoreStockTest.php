@@ -109,7 +109,7 @@ final class CartRestoreStockTest extends IntegrationTestCase
     public function testAVirtualProductHasNoStockToRunOutOf(): void
     {
         [$cart, $product] = $this->cartAndProduct(0);
-        Propel::getConnection('TheliaMain')->exec(\sprintf('UPDATE product SET virtual = 1 WHERE id = %d', $product->getId()));
+        Propel::getConnection('TheliaMain')->exec(\sprintf('UPDATE product SET `virtual` = 1 WHERE id = %d', $product->getId()));
         $component = $this->component($product, 1);
 
         $component->restoreCartItem($this->pseId($product), $product->getId(), 1);
