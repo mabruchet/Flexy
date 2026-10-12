@@ -33,7 +33,9 @@ use Thelia\Domain\Cart\DTO\CartItemAddDTO;
 use Thelia\Domain\Cart\DTO\CartItemDeleteDTO;
 use Thelia\Domain\Cart\DTO\CartItemUpdateQuantityDTO;
 use Thelia\Form\Definition\FrontForm;
+use Thelia\Model\Lang;
 use Thelia\Model\ProductImageQuery;
+use Thelia\Model\ProductSaleElements;
 use Thelia\Model\ProductSaleElementsProductImageQuery;
 use Thelia\Model\ProductSaleElementsQuery;
 
@@ -119,8 +121,12 @@ class Base
 
         // TYPE_CAMELNAME, so `is_offered` reaches the DTO as `isOffered` along with every
         // other column of the line.
-        foreach ($cart->getCartItems()->toArray(null, false, TableMap::TYPE_CAMELNAME) as $item) {
-            $pse = ProductSaleElementsQuery::create()->findOneById($item['productSaleElementsId']);
+        $lines = $cart->getCartItems()->toArray(null, false, TableMap::TYPE_CAMELNAME);
+        $locale = Lang::getDefaultLanguage()->getLocale();
+        $combinations = $this->readCombinations($lines, $locale);
+
+        foreach ($lines as $item) {
+            $pse = $combinations[(int) $item['productSaleElementsId']] ?? null;
 
             if (null === $pse) {
                 continue;
@@ -136,7 +142,7 @@ class Base
                 'product' => null,
                 'stock' => (int) $pse->getQuantity(),
                 'stockManaged' => $stockManaged,
-                'title' => $pse->getProduct()->getTitle(),
+                'title' => $pse->getProduct()->setLocale($locale)->getTitle(),
                 'offeredTaxedDiscount' => $offeredDiscounts[(int) $item['id']] ?? 0.0,
             ]);
 
@@ -148,6 +154,44 @@ class Base
                 $this->itemHasInsufficientStockMessage = true;
             }
         }
+    }
+
+    /**
+     * The combinations the lines point at, indexed by id, each with its product and the
+     * translation of that product in the default language of the shop, in one query: a query per
+     * line would make every render of the cart (the cart page, the cart step of the checkout)
+     * cost more with each product in it.
+     *
+     * The title is the one a line has always shown: `CartItem::getProduct()` sets the locale of
+     * the product to the default language of the shop (its fallback to that same language when a
+     * translation is missing changes nothing). The translation is joined with a LEFT JOIN, so a
+     * product with no translation in that language stays in the cart, with no title.
+     *
+     * @param list<array<string, mixed>> $lines
+     *
+     * @return array<int, ProductSaleElements>
+     */
+    private function readCombinations(array $lines, string $locale): array
+    {
+        $combinationIds = array_values(array_unique(array_map(static fn (array $line): int => (int) $line['productSaleElementsId'], $lines)));
+
+        if ([] === $combinationIds) {
+            return [];
+        }
+
+        $combinations = [];
+
+        foreach (ProductSaleElementsQuery::create()
+            ->filterById($combinationIds)
+            ->joinWithProduct()
+            ->useProductQuery()
+                ->joinWithI18n($locale)
+            ->endUse()
+            ->find() as $combination) {
+            $combinations[$combination->getId()] = $combination;
+        }
+
+        return $combinations;
     }
 
     /**
