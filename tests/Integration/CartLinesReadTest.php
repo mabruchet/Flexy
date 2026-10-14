@@ -15,6 +15,7 @@ declare(strict_types=1);
 namespace FlexyBundle\Tests\Integration;
 
 use FlexyBundle\Components\Organisms\Cart\Base as Cart;
+use Propel\Runtime\ActiveQuery\Criteria;
 use Propel\Runtime\Connection\ConnectionWrapper;
 use Propel\Runtime\Propel;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -22,13 +23,15 @@ use Symfony\UX\TwigComponent\ComponentFactory;
 use Thelia\Core\HttpFoundation\Session\Session;
 use Thelia\Model\Cart as CartModel;
 use Thelia\Model\CartQuery;
+use Thelia\Model\ConfigQuery;
 use Thelia\Model\Lang;
 use Thelia\Model\LangQuery;
 use Thelia\Test\IntegrationTestCase;
 
 /**
  * The cart component reads the lines of a cart in a number of queries that does not grow with the cart (the cart page and the
- * cart step of the checkout render it), and keeps the title of a line in the default language of the shop. Runs on an installed shop (bin/test-prepare).
+ * cart step of the checkout render it), and titles a line in the language of the session, falling back to the default language of
+ * the shop for a product not translated in it. Runs on an installed shop (bin/test-prepare).
  */
 final class CartLinesReadTest extends IntegrationTestCase
 {
@@ -73,29 +76,31 @@ final class CartLinesReadTest extends IntegrationTestCase
         self::assertSame([1, 2, 3], array_map(static fn ($item): int => $item->stock, $component->items));
     }
 
-    public function testTheTitleIsTheOneOfTheDefaultLanguageOfTheShop(): void
+    public function testTheTitleIsTheOneOfTheLanguageOfTheSession(): void
     {
-        $this->makeFrenchTheDefaultLanguage();
+        // The rule of the core (CartItem::getProduct) falls back to the default language when the setting is 1, its default.
+        ConfigQuery::write('default_lang_without_translation', '1');
+        $defaultLocale = Lang::getDefaultLanguage()->getLocale();
+        $sessionLang = LangQuery::create()->filterByLocale($defaultLocale, Criteria::NOT_EQUAL)->filterByActive(1)->findOne();
+        \assert($sessionLang instanceof Lang);
+        $sessionLocale = $sessionLang->getLocale();
 
-        try {
-            $factory = $this->createFixtureFactory();
-            $currency = $factory->currency();
-            $category = $factory->category();
-            $taxRule = $factory->taxRule();
-            $translated = $factory->product($category, $taxRule, $currency, ['ref' => 'TITLE-1', 'title' => 'Titre francais', 'locale' => 'fr_FR', 'basePrice' => 10.0, 'baseQuantity' => 1]);
-            $translated->setLocale('en_US')->setTitle('English title')->save();
-            // Titled in English only: the shop has nothing to show in its default language.
-            $untranslated = $factory->product($category, $taxRule, $currency, ['ref' => 'TITLE-2', 'title' => 'Only English', 'locale' => 'en_US', 'basePrice' => 10.0, 'baseQuantity' => 1]);
-            $cart = $factory->cart(null, ['currency' => $currency]);
-            $factory->cartItem($cart, $translated);
-            $factory->cartItem($cart, $untranslated);
+        $factory = $this->createFixtureFactory();
+        $currency = $factory->currency();
+        $category = $factory->category();
+        $taxRule = $factory->taxRule();
+        $translated = $factory->product($category, $taxRule, $currency, ['ref' => 'TITLE-1', 'title' => 'Session title', 'locale' => $sessionLocale, 'basePrice' => 10.0, 'baseQuantity' => 1]);
+        $translated->setLocale($defaultLocale)->setTitle('Default title')->save();
+        // Titled in the default language only: the session has nothing of its own to show.
+        $untranslated = $factory->product($category, $taxRule, $currency, ['ref' => 'TITLE-2', 'title' => 'Only default', 'locale' => $defaultLocale, 'basePrice' => 10.0, 'baseQuantity' => 1]);
+        $cart = $factory->cart(null, ['currency' => $currency]);
+        $factory->cartItem($cart, $translated);
+        $factory->cartItem($cart, $untranslated);
 
-            $this->putInSession($cart);
+        $this->putInSession($cart);
+        $this->session()->setLang($sessionLang);
 
-            self::assertSame(['Titre francais', ''], array_map(static fn ($item): string => $item->title, $this->component()->items));
-        } finally {
-            $this->resetDefaultLanguage();
-        }
+        self::assertSame(['Session title', 'Only default'], array_map(static fn ($item): string => $item->title, $this->component()->items));
     }
 
     /**
@@ -132,23 +137,6 @@ final class CartLinesReadTest extends IntegrationTestCase
         return [$this->queriesToRead($small, 1), $this->queriesToRead($large, 4)];
     }
 
-    private function makeFrenchTheDefaultLanguage(): void
-    {
-        $this->resetDefaultLanguage();
-        $lang = LangQuery::create()->findOneByByDefault(1);
-        \assert($lang instanceof Lang);
-        $lang->setLocale('fr_FR')->save();
-        $this->resetDefaultLanguage();
-    }
-
-    /**
-     * Lang keeps the default language in a static: it must not outlive the transaction that changed it.
-     */
-    private function resetDefaultLanguage(): void
-    {
-        (new \ReflectionProperty(Lang::class, 'defaultLanguage'))->setValue(null, null);
-    }
-
     /**
      * The queries the component runs to read the lines of a cart put in session.
      */
@@ -173,11 +161,17 @@ final class CartLinesReadTest extends IntegrationTestCase
 
     private function putInSession(CartModel $cart): void
     {
+        $this->session()->setSessionCart(CartQuery::create()->findPk($cart->getId()));
+    }
+
+    private function session(): Session
+    {
         $stack = static::getContainer()->get('request_stack');
         \assert($stack instanceof RequestStack);
         $session = $stack->getCurrentRequest()?->getSession();
         \assert($session instanceof Session);
-        $session->setSessionCart(CartQuery::create()->findPk($cart->getId()));
+
+        return $session;
     }
 
     private function component(): Cart
