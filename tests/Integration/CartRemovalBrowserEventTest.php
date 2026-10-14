@@ -27,6 +27,7 @@ use Thelia\Domain\Cart\Service\CartItemService;
 use Thelia\Domain\Cart\Service\CartRetriever;
 use Thelia\Domain\Cart\Service\CartSelectionService;
 use Thelia\Domain\Checkout\Service\GiftWrappingProvider;
+use Thelia\Domain\Localization\Service\LangService;
 use Thelia\Domain\Shipping\Service\PostageHandler;
 use Thelia\Domain\Taxation\TaxEngine\TaxCalculatorFactoryInterface;
 use Thelia\Model\Cart as CartModel;
@@ -83,6 +84,7 @@ final class CartRemovalBrowserEventTest extends IntegrationTestCase
             self::createStub(FormServiceInterface::class),
             new CartStockService(),
             self::createStub(AttributeAccessService::class),
+            self::createStub(LangService::class),
         );
         $cart->setLiveResponder($responder);
         $cart->items = [CartItemDto::fromArray([

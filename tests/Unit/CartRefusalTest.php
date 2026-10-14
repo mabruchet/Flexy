@@ -34,6 +34,7 @@ use Thelia\Domain\Cart\Service\CartItemService;
 use Thelia\Domain\Cart\Service\CartRetriever;
 use Thelia\Domain\Cart\Service\CartSelectionService;
 use Thelia\Domain\Checkout\Service\GiftWrappingProvider;
+use Thelia\Domain\Localization\Service\LangService;
 use Thelia\Domain\Shipping\Service\PostageHandler;
 use Thelia\Domain\Taxation\TaxEngine\TaxCalculatorFactoryInterface;
 use Thelia\Model\Cart as CartModel;
@@ -201,6 +202,7 @@ final class CartRefusalTest extends TestCase
             $formService,
             new CartStockService(),
             self::createStub(AttributeAccessService::class),
+            self::createStub(LangService::class),
         );
         $component->setLiveResponder($responder);
         // Stock not managed: the bounds of plus() and minus() would read the line's stock.

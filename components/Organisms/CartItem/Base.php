@@ -96,9 +96,11 @@ class Base
         }
 
         $this->promo = (bool) $cartItemModel->getPromo();
+        $locale = $this->langService->getLocale();
+        $product->setLocale($locale);
         $this->title = (string) $product->getTitle();
         $this->desc = $product->getChapo();
-        $this->url = $product->getUrl($this->langService->getLocale());
+        $this->url = $product->getUrl($locale);
         $this->outOfStock = $this->cartStockService->isOutOfStock($cartItem);
         $this->insufficientStock = $this->cartStockService->isInsufficient($cartItem);
         $this->attributesAv = $this->pseService->getAttributesAvFromPse($pse);

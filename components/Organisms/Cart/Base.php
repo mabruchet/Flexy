@@ -34,6 +34,7 @@ use Thelia\Domain\Cart\DTO\CartItemDeleteDTO;
 use Thelia\Domain\Cart\DTO\CartItemUpdateQuantityDTO;
 use Thelia\Domain\Cart\Exception\InvalidCartException;
 use Thelia\Domain\Cart\Exception\NotEnoughStockException;
+use Thelia\Domain\Localization\Service\LangService;
 use Thelia\Form\Definition\FrontForm;
 use Thelia\Model\ProductImageQuery;
 use Thelia\Model\ProductSaleElementsProductImageQuery;
@@ -94,6 +95,7 @@ class Base
         private readonly FormServiceInterface $formService,
         private readonly CartStockService $cartStockService,
         private readonly AttributeAccessService $attributeAccessService,
+        private readonly LangService $langService,
     ) {
     }
 
@@ -133,6 +135,7 @@ class Base
         }
 
         $this->unavailablePromotionMessages = $this->readUnavailablePromotions();
+        $locale = $this->langService->getLocale();
         $offeredDiscounts = $this->readOfferedLineDiscounts();
 
         // TYPE_CAMELNAME, so `is_offered` reaches the DTO as `isOffered` along with every
@@ -154,7 +157,7 @@ class Base
                 'product' => null,
                 'stock' => (int) $pse->getQuantity(),
                 'stockManaged' => $stockManaged,
-                'title' => $pse->getProduct()->getTitle(),
+                'title' => $pse->getProduct()->setLocale($locale)->getTitle(),
                 'offeredTaxedDiscount' => $offeredDiscounts[(int) $item['id']] ?? 0.0,
             ]);
 
