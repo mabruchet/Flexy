@@ -33,6 +33,7 @@ use Thelia\Domain\Taxation\TaxEngine\TaxCalculatorFactoryInterface;
 use Thelia\Domain\Taxation\TaxEngine\TaxEngine;
 use Thelia\Model\Cart as CartModel;
 use Thelia\Model\CartItem as CartItemModel;
+use Thelia\Model\ConfigQuery;
 use Thelia\Model\CurrencyQuery;
 use Thelia\Test\IntegrationTestCase;
 
@@ -92,6 +93,31 @@ final class CartLineTitleLocaleTest extends IntegrationTestCase
         self::assertSame('Helm', $cart->items[0]->title);
     }
 
+    public function testAProductWithoutTranslationFallsBackToTheDefaultLanguageOfTheShop(): void
+    {
+        // The rule of the core (CartItem::getProduct) falls back to the default language when the setting is 1, its
+        // default: with no row for it the core reads the integer 1 and applies it.
+        ConfigQuery::create()->filterByName('default_lang_without_translation')->delete();
+        ConfigQuery::resetCache();
+        $factory = $this->createFixtureFactory();
+        $currency = CurrencyQuery::create()->findOneByByDefault(1);
+        $untranslated = $factory->product($factory->category(), $factory->taxRule(), $currency, ['title' => 'Gloves', 'locale' => 'en_US']);
+        $cartModel = $factory->cart(null, ['currency' => $currency]);
+        $line = $factory->cartItem($cartModel, $untranslated);
+
+        try {
+            $item = $this->cartItem('de_DE');
+            $item->mount($this->lineOf($line));
+            $cart = $this->cart('de_DE', $cartModel);
+            $cart->fetchCart();
+        } finally {
+            ConfigQuery::write('default_lang_without_translation', '1');
+        }
+
+        self::assertSame('Gloves', $item->title);
+        self::assertSame('Gloves', $cart->items[0]->title);
+    }
+
     private function lineOf(CartItemModel $model): CartItemDto
     {
         return CartItemDto::fromArray([
@@ -125,10 +151,10 @@ final class CartLineTitleLocaleTest extends IntegrationTestCase
         );
     }
 
-    private function cart(string $locale): Cart
+    private function cart(string $locale, ?CartModel $cartModel = null): Cart
     {
         $cartRetriever = self::createStub(CartRetriever::class);
-        $cartRetriever->method('fromSession')->willReturn($this->cartModel);
+        $cartRetriever->method('fromSession')->willReturn($cartModel ?? $this->cartModel);
 
         return new Cart(
             new CartFacade(

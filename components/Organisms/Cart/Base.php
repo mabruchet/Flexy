@@ -140,7 +140,8 @@ class Base
 
         // TYPE_CAMELNAME, so `is_offered` reaches the DTO as `isOffered` along with every
         // other column of the line.
-        foreach ($cart->getCartItems()->toArray(null, false, TableMap::TYPE_CAMELNAME) as $item) {
+        foreach ($cart->getCartItems() as $cartItemModel) {
+            $item = $cartItemModel->toArray(TableMap::TYPE_CAMELNAME, true, [], true);
             $pse = ProductSaleElementsQuery::create()->findOneById($item['productSaleElementsId']);
 
             if (null === $pse) {
@@ -157,7 +158,7 @@ class Base
                 'product' => null,
                 'stock' => (int) $pse->getQuantity(),
                 'stockManaged' => $stockManaged,
-                'title' => $pse->getProduct()->setLocale($locale)->getTitle(),
+                'title' => $cartItemModel->getProduct(null, $locale)->getTitle(),
                 'offeredTaxedDiscount' => $offeredDiscounts[(int) $item['id']] ?? 0.0,
             ]);
 
