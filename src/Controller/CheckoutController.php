@@ -296,6 +296,10 @@ class CheckoutController extends FlexyController
             // without is nobody else's job from here on.
             $checkoutFacade->settleVirtualDeliveryIfNeeded($cart);
 
+            // The total can have changed with the delivery just settled: what the instant
+            // means were read to apply under the old one is read again by whoever asks next.
+            $paymentParts->forget();
+
             $checkoutFacade->validateForOrder($cart);
 
             // validateForOrder() does not look at stock, and the core only re-checks it once the

@@ -256,6 +256,54 @@ final class PaymentPartsAndStoredMethodsTest extends WebIntegrationTestCase
         self::assertSame((int) $instant->getId(), $this->reread($cart)->getPaymentModuleId());
     }
 
+    public function testAProviderThatCannotChargeTheBalanceIsToldToTheBuyerWhenAnotherProviderCan(): void
+    {
+        $this->installPaymentModule(InstantTestPaymentModule::class, static::getContainer(), $this->getPropelConnection());
+        $this->installPaymentModule(BalanceChargingTestPaymentModule::class, static::getContainer(), $this->getPropelConnection());
+        InstantTestPaymentModule::$appliedAmount = '1.00';
+        $this->readyCart($this->moduleNamed('Cheque'));
+
+        $crawler = $this->requestThePaymentStep();
+
+        self::assertStringContainsString('The payment method you chose cannot be combined with another payment means: choose another one.', $crawler->text());
+        self::assertStringNotContainsString('This means cannot be combined', $crawler->text(), 'A provider can charge the balance: the buyer has something to choose.');
+    }
+
+    public function testACartWithoutIdIsNeverReadFromTheMemoOfAnotherOne(): void
+    {
+        $this->installPaymentModule(InstantTestPaymentModule::class, static::getContainer(), $this->getPropelConnection());
+        InstantTestPaymentModule::$appliedAmount = '0';
+        $parts = $this->getService(\FlexyBundle\Service\InstantPaymentParts::class);
+        $parts->reset();
+
+        InstantTestPaymentModule::$askedAboutCartIds = [];
+        $parts->viewOf(new Cart(), null, '');
+        $parts->viewOf(new Cart(), null, '');
+        self::assertCount(2, InstantTestPaymentModule::$askedAboutCartIds, 'Two carts with no id share no key: each is asked.');
+
+        $saved = $this->readyCart(null);
+        InstantTestPaymentModule::$askedAboutCartIds = [];
+        $parts->viewOf($saved, null, '');
+        $parts->viewOf($saved, null, '');
+        self::assertCount(1, InstantTestPaymentModule::$askedAboutCartIds, 'A saved cart is asked once: the memo holds for it.');
+    }
+
+    public function testThePaymentStepListensToThePartsChangedEventOfTheModules(): void
+    {
+        $this->installPaymentModule(InstantTestPaymentModule::class, static::getContainer(), $this->getPropelConnection());
+        $this->readyCart(null);
+
+        $component = $this->requestThePaymentStep()->filter(\sprintf('[data-live-name-value="%s"]', self::COMPONENT))->first();
+        self::assertCount(1, $component);
+
+        $listeners = json_decode((string) $component->attr('data-live-listeners-value'), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertContains(
+            ['action' => 'readThePartsAgain', 'event' => \FlexyBundle\Event\CheckoutEvents::PAYMENT_PARTS_CHANGED],
+            $listeners,
+            'The event a live component of a module emits (from the browser, to every live component) reaches the step through this declaration.',
+        );
+    }
+
     public function testTheModulesAreAskedTheirPartOnlyOncePerCompositionWhenTheStepIsDrawn(): void
     {
         $this->installPaymentModule(InstantTestPaymentModule::class, static::getContainer(), $this->getPropelConnection());

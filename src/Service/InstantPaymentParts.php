@@ -215,6 +215,11 @@ final class InstantPaymentParts implements ResetInterface
      */
     private function amountApplied(InstantPaymentModuleInterface $instance, Cart $cart, int $moduleId): string
     {
+        // A cart with no id has no key of its own: every one of them would share ":module".
+        if (null === $cart->getId()) {
+            return $this->readAmountApplied($instance, $cart, $moduleId);
+        }
+
         $key = $cart->getId().':'.$moduleId;
 
         return $this->amounts[$key] ??= $this->readAmountApplied($instance, $cart, $moduleId);
@@ -243,14 +248,25 @@ final class InstantPaymentParts implements ResetInterface
      */
     private function compositionOf(Cart $cart, int $paymentModuleId): PaymentComposition
     {
-        $key = $cart->getId().':'.$paymentModuleId;
+        // Kept by cart and module only: the total is not part of the key, so whoever changes it forgets.
+        $key = null === $cart->getId() ? null : $cart->getId().':'.$paymentModuleId;
 
-        if (!isset($this->compositions[$key])) {
+        if (null === $key || !isset($this->compositions[$key])) {
             try {
-                $this->compositions[$key] = $this->composer->composeForCart($cart, $paymentModuleId);
+                $composition = $this->composer->composeForCart($cart, $paymentModuleId);
             } catch (PaymentCompositionRefusedException $refusal) {
-                $this->compositions[$key] = $refusal;
+                $composition = $refusal;
             }
+
+            if (null === $key) {
+                if ($composition instanceof PaymentCompositionRefusedException) {
+                    throw $composition;
+                }
+
+                return $composition;
+            }
+
+            $this->compositions[$key] = $composition;
         }
 
         $composition = $this->compositions[$key];
