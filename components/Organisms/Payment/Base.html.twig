@@ -2,13 +2,85 @@
     <{{ this.headingLevel }} class="text-black h4">
         {{ 'Choose a payment method'|trans }}
     </{{ this.headingLevel }}>
-    <ul class="flex flex-col gap-3.5 my-5">
-        {% for module in this.modules|filter(m => m.valid) %}
-            <li>
-                <twig:Organisms:PaymentCard:Base :module="module" :optionChoices="this.paymentOptionChoices" />
-            </li>
-        {% endfor %}
-    </ul>
+    {% set parts = this.parts %}
+
+    {% if this.notice == 'stored_method_refused' %}
+        <twig:Molecules:SnackBar:Base
+            variant="warning"
+            withIcon
+            role="alert"
+            class="my-5"
+            text="{{ 'This saved payment method can no longer be used: choose another or pay with a new one.'|trans|escape('html') }}"
+        />
+    {% endif %}
+
+    {# The means that pay part of the order inside the shop (a gift card, a credit note, a
+       wallet). Each module applies its own part, from the point it draws here; the amounts
+       and what is left are the core's composition of the payment, not a sum made here. #}
+    {% if parts.parts|length %}
+        <section class="my-5" aria-labelledby="payment-parts-title">
+            <{{ this.partsHeadingLevel }} id="payment-parts-title" class="text-black h4">
+                {{ 'Pay part of your order with'|trans }}
+            </{{ this.partsHeadingLevel }}>
+            <ul class="flex flex-col gap-3.5 my-5">
+                {% for part in parts.parts %}
+                    <li class="PaymentCard">
+                        <span class="PaymentCard-title">{{ part.title }}</span>
+                        {% if part.amount|number_format(2) != '0.00' %}
+                            <span dir="ltr">&minus;{{ part.amount|format_currency('EUR', locale: lang_code) }}</span>
+                        {% endif %}
+                        {{ theme_hook('checkout.payment.parts', {
+                            module: part.moduleId,
+                            amount: part.amount,
+                        }) }}
+                    </li>
+                {% endfor %}
+            </ul>
+
+            {% if parts.coversTheOrder %}
+                <twig:Molecules:SnackBar:Base
+                    variant="success"
+                    withIcon
+                    text="{{ 'Nothing is left to pay: your order is paid in full with the means above.'|trans|escape('html') }}"
+                />
+            {% elseif parts.balance is not null %}
+                <p class="paragraph-3 text-black">
+                    {{ 'Left to pay'|trans }}
+                    <strong dir="ltr">{{ parts.balance|format_currency('EUR', locale: lang_code) }}</strong>
+                </p>
+            {% elseif this.noProviderCanChargeTheBalance %}
+                <twig:Molecules:SnackBar:Base
+                    variant="warning"
+                    withIcon
+                    role="alert"
+                    text="{{ 'This means cannot be combined with another payment method: remove the part or cover the whole total.'|trans|escape('html') }}"
+                />
+            {% elseif parts.refusal == 'provider-cannot-charge-balance' %}
+                <twig:Molecules:SnackBar:Base
+                    variant="warning"
+                    withIcon
+                    role="alert"
+                    text="{{ 'The payment method you chose cannot be combined with another payment means: choose another one.'|trans|escape('html') }}"
+                />
+            {% elseif parts.refusal %}
+                <twig:Molecules:SnackBar:Base
+                    variant="warning"
+                    withIcon
+                    text="{{ 'Choose how to pay the rest of your order.'|trans|escape('html') }}"
+                />
+            {% endif %}
+        </section>
+    {% endif %}
+
+    {% if not parts.coversTheOrder %}
+        <ul class="flex flex-col gap-3.5 my-5">
+            {% for module in this.providers %}
+                <li>
+                    <twig:Organisms:PaymentCard:Base :module="module" :optionChoices="this.paymentOptionChoices" :storedMethodId="this.storedMethodId" />
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     <twig:Organisms:Invoice:Base />
 
     {# On this step and not on the delivery one: the wrapping is charged, so the buyer picks

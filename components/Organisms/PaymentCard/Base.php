@@ -31,6 +31,11 @@ class Base
      */
     public array $optionChoices = [];
 
+    /**
+     * The stored payment method written on the cart, null when the buyer pays with a new one.
+     */
+    public ?int $storedMethodId = null;
+
     public function __construct(private readonly CartFacade $cartFacade)
     {
     }
@@ -40,6 +45,20 @@ class Base
     {
         $this->checked = null !== $this->module
             && $this->module['id'] === $this->cartFacade->getPaymentModuleId();
+    }
+
+    /**
+     * Whether an option of the core's stored-methods group is the one the cart pays with:
+     * the method written on it, or, for the option of a new method that names none, no
+     * method at all.
+     *
+     * @param array<string, mixed> $option
+     */
+    public function isStoredOptionPicked(array $option): bool
+    {
+        $methodId = $option['customerPaymentMethodId'] ?? null;
+
+        return null === $methodId ? null === $this->storedMethodId : (int) $methodId === $this->storedMethodId;
     }
 
     public function isOptionPicked(string $groupCode, string $optionCode): bool

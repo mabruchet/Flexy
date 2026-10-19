@@ -41,6 +41,13 @@ final class CheckoutEvents
      */
     public const DELIVERY_DATE_CHOSEN = 'DELIVERY_DATE_CHOSEN';
     public const SET_PAYMENT_MODULE_ID = 'SET_PAYMENT_MODULE_ID';
+
+    /**
+     * Emitted by whatever changed the amount an instant payment means (a gift card, a
+     * wallet) applies to the cart, for the payment step to read the composition again:
+     * the amount left to pay, and the payment methods that follow from it.
+     */
+    public const PAYMENT_PARTS_CHANGED = 'PAYMENT_PARTS_CHANGED';
     public const SET_DELIVERY_ORDER_ADDRESS_ID = 'SET_DELIVERY_ORDER_ADDRESS_ID';
     public const SET_INVOICE_ORDER_ADDRESS_ID = 'SET_INVOICE_ORDER_ADDRESS_ID';
     public const ADD_NEW_DELIVERY_ADDRESS = 'ADD_NEW_DELIVERY_ADDRESS';

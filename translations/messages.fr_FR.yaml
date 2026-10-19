@@ -630,3 +630,13 @@ On eligible orders: Sur les commandes éligibles
 '%products% cannot be shipped to this address. Remove them from your cart or choose another address.': "%products% ne peuvent pas être expédiés à cette adresse. Retirez-les de votre panier ou choisissez une autre adresse."
 'Not available for your address': "Non disponible pour votre adresse"
 'Nothing was added to your cart: a product cannot be delivered to your address. Remove its line to add the others.': "Rien n'a été ajouté à votre panier : un produit ne peut pas être livré à votre adresse. Retirez sa ligne pour ajouter les autres."
+'This saved payment method can no longer be used: choose another or pay with a new one.': 'Ce moyen de paiement enregistré ne peut plus être utilisé : choisissez-en un autre ou payez avec un nouveau moyen.'
+Pay part of your order with: Régler une partie de votre commande avec
+'Nothing is left to pay: your order is paid in full with the means above.': 'Il ne reste rien à payer : votre commande est réglée en totalité avec les moyens ci-dessus.'
+Left to pay: Reste à payer
+'The payment method you chose cannot be combined with another payment means: choose another one.': 'Le mode de paiement choisi ne peut pas être combiné avec un autre moyen de paiement : choisissez-en un autre.'
+Choose how to pay the rest of your order.: Choisissez comment régler le reste de votre commande.
+Expires %date%: Expire le %date%
+Default: Par défaut
+Too many payments with a saved payment method in a short time. Please try again later, or pay with a new payment method.: Trop de paiements avec un moyen de paiement enregistré en peu de temps. Réessayez plus tard, ou payez avec un nouveau moyen de paiement.
+'This means cannot be combined with another payment method: remove the part or cover the whole total.': 'Ce moyen ne peut pas être combiné avec un autre moyen de paiement : retirez la part ou couvrez tout le total.'

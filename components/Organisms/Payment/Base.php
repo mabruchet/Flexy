@@ -14,7 +14,9 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Components\Organisms\Payment;
 
+use FlexyBundle\DTO\PaymentPartsView;
 use FlexyBundle\Event\CheckoutEvents;
+use FlexyBundle\Service\InstantPaymentParts;
 use FlexyBundle\Service\PaymentOptionChoice;
 use FlexyBundle\Service\PaymentOptionChoiceStore;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
@@ -32,6 +34,7 @@ use Thelia\Domain\Checkout\DTO\CheckoutDTO;
 use Thelia\Domain\Checkout\Service\ConsentAcceptanceStore;
 use Thelia\Domain\Checkout\Service\ConsentProvider;
 use Thelia\Domain\Localization\Service\LangService;
+use Thelia\Domain\Payment\Exception\CustomerPaymentMethodException;
 
 #[AsLiveComponent]
 class Base
@@ -48,6 +51,9 @@ class Base
      */
     #[LiveProp]
     public string $headingLevel = 'h1';
+
+    /** The code of the option group in which the core offers the buyer's stored payment methods. */
+    private const STORED_METHODS_GROUP = 'stored_methods';
 
     #[LiveProp]
     public ?int $paymentModuleId = null;
@@ -77,8 +83,17 @@ class Base
     #[LiveProp]
     public array $paymentOptionChoices = [];
 
+    /**
+     * Why the last choice of the buyer was not kept, as a code the template turns into a
+     * sentence. Not live state: it is read by the render that follows the choice and is
+     * gone with the next one.
+     */
+    public ?string $notice = null;
+
     /** @var array<array-key, array<string, mixed>>|null */
     private ?array $modules = null;
+
+    private ?PaymentPartsView $partsView = null;
 
     public function __construct(
         private readonly DataAccessService $dataAccessService,
@@ -88,13 +103,16 @@ class Base
         private readonly LangService $langService,
         private readonly ContentSlotService $contentSlotService,
         private readonly PaymentOptionChoiceStore $paymentOptionChoiceStore,
+        private readonly InstantPaymentParts $instantPaymentParts,
     ) {
     }
 
     public function mount(): void
     {
-        $this->invoiceAddressId = $this->cartFacade->getInvoiceAddressId();
-        $this->paymentModuleId = $this->cartFacade->getPaymentModuleId();
+        // Before anything is read off the cart: a payment the instant means make whole has
+        // no provider for the buyer to pick, and the step is not settled without a module.
+        $this->settleTheModuleOfTheParts();
+        $this->refillFromTheCart();
         $this->consentAcceptances = $this->consentAcceptanceStore->all();
         $this->paymentOptionChoices = $this->paymentOptionChoiceStore->all();
     }
@@ -102,6 +120,184 @@ class Base
     public function getModules(): array
     {
         return $this->modules ??= $this->dataAccessService->resources('/api/front/payment/modules') ?? [];
+    }
+
+    /**
+     * The stored payment method written on the cart, null when the buyer pays with a new
+     * one. Read off the cart at each render and kept nowhere else: the cart is what the
+     * core pays the order with, and a live property would come back from the browser as
+     * the buyer last saw it.
+     */
+    public function getStoredMethodId(): ?int
+    {
+        return $this->cartFacade->getOrCreateFromSession()->getCustomerPaymentMethodId();
+    }
+
+    /**
+     * What the instant means of the cart pay of it, and what is left.
+     */
+    public function getParts(): PaymentPartsView
+    {
+        return $this->partsView ??= $this->instantPaymentParts->viewOf(
+            $this->cartFacade->getOrCreateFromSession(),
+            $this->cartFacade->getPaymentModuleId(),
+            (string) $this->langService->getLocale(),
+        );
+    }
+
+    /**
+     * The payment methods the buyer picks the provider of the payment from.
+     *
+     * An instant means is not one of them: it is applied in the block of the parts, by the
+     * module itself. Nothing is offered when the parts pay the order whole, and once they
+     * pay a part of it only the modules the core lets charge the balance are: the others
+     * would be refused at the placement.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getProviders(): array
+    {
+        $parts = $this->getParts();
+
+        if ($parts->coversTheOrder) {
+            return [];
+        }
+
+        $providers = [];
+
+        foreach ($this->getModules() as $module) {
+            $moduleId = (int) ($module['id'] ?? 0);
+
+            if (!($module['valid'] ?? false) || $this->instantPaymentParts->isInstant($moduleId)) {
+                continue;
+            }
+
+            if ($parts->active && !$this->instantPaymentParts->chargesTheBalance($moduleId)) {
+                continue;
+            }
+
+            $providers[] = $module;
+        }
+
+        return $providers;
+    }
+
+    /**
+     * Whether an instant means pays a part of the order and no provider is able to charge
+     * what is left: the buyer has nothing to choose, and is told why.
+     */
+    public function getNoProviderCanChargeTheBalance(): bool
+    {
+        $parts = $this->getParts();
+
+        return $parts->active && !$parts->coversTheOrder && [] === $this->getProviders();
+    }
+
+    /**
+     * The tag of the block of the parts: the step's own level, one down.
+     */
+    public function getPartsHeadingLevel(): string
+    {
+        return 'h'.min(6, 1 + (int) substr($this->headingLevel, 1));
+    }
+
+    /**
+     * Read again by the render that follows: what the module that owns a part just changed
+     * is read off the module, not off what this component showed before.
+     */
+    #[LiveListener(CheckoutEvents::PAYMENT_PARTS_CHANGED)]
+    public function readThePartsAgain(): void
+    {
+        $this->instantPaymentParts->forget();
+        $this->partsView = null;
+        $this->settleTheModuleOfTheParts();
+        $this->refillFromTheCart();
+
+        $this->emit('updateNextButton');
+    }
+
+    /**
+     * Writes the stored payment method the buyer picked on the cart, or none for a new one.
+     *
+     * Through the core, which judges it: the method must be the buyer's, stored through the
+     * module chosen and not expired. A refusal writes nothing and is shown as a notice; the
+     * theme keeps no copy of the choice.
+     */
+    #[LiveAction]
+    public function chooseStoredMethod(#[LiveArg] int $customerPaymentMethodId = 0): void
+    {
+        $this->notice = null;
+
+        // The module the cart names now, not the one the browser last saw.
+        $paymentModuleId = $this->cartFacade->getPaymentModuleId();
+
+        if (null !== $paymentModuleId) {
+            try {
+                $this->cartFacade->setPaymentModule(new CheckoutDTO(
+                    cart: $this->cartFacade->getOrCreateFromSession(),
+                    paymentModuleId: $paymentModuleId,
+                    customerPaymentMethodId: $customerPaymentMethodId > 0 ? $customerPaymentMethodId : null,
+                ));
+            } catch (CustomerPaymentMethodException) {
+                $this->notice = 'stored_method_refused';
+            }
+        }
+
+        $this->refillFromTheCart();
+        $this->emit('updateNextButton');
+    }
+
+    /**
+     * The stored methods a module offers for this cart, from its option group.
+     *
+     * @param array<string, mixed> $module
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function storedMethodsOf(array $module): array
+    {
+        foreach ($module['optionGroups'] ?? [] as $group) {
+            if (self::STORED_METHODS_GROUP === ($group['code'] ?? null)) {
+                return array_values(array_filter(
+                    $group['options'] ?? [],
+                    static fn (array $option): bool => null !== ($option['customerPaymentMethodId'] ?? null),
+                ));
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * The method to pay with when a module is chosen: the one the buyer made their default,
+     * else the first the module offers, which the core lists default first. None when the
+     * module offers none.
+     *
+     * @param array<string, mixed> $module
+     */
+    private function storedMethodToPreselect(array $module): ?int
+    {
+        $methods = $this->storedMethodsOf($module);
+
+        foreach ($methods as $method) {
+            if ($method['default'] ?? false) {
+                return (int) $method['customerPaymentMethodId'];
+            }
+        }
+
+        return [] === $methods ? null : (int) $methods[0]['customerPaymentMethodId'];
+    }
+
+    private function settleTheModuleOfTheParts(): void
+    {
+        $this->instantPaymentParts->settleThePaymentModuleOfTheCart($this->cartFacade->getOrCreateFromSession());
+        $this->partsView = null;
+    }
+
+    private function refillFromTheCart(): void
+    {
+        $this->invoiceAddressId = $this->cartFacade->getInvoiceAddressId();
+        $this->paymentModuleId = $this->cartFacade->getPaymentModuleId();
     }
 
     /**
@@ -132,7 +328,12 @@ class Base
     {
         foreach ($this->getModules() as $module) {
             if (($module['valid'] ?? false) && (int) $module['id'] === $this->paymentModuleId) {
-                return $module['optionGroups'] ?? [];
+                // The stored methods are written on the cart by the core, never kept here:
+                // see chooseStoredMethod().
+                return array_values(array_filter(
+                    $module['optionGroups'] ?? [],
+                    static fn (array $group): bool => self::STORED_METHODS_GROUP !== ($group['code'] ?? null),
+                ));
             }
         }
 
@@ -216,13 +417,35 @@ class Base
     #[LiveListener(CheckoutEvents::SET_PAYMENT_MODULE_ID)]
     public function selectPaymentModuleId(#[LiveArg] int $moduleId): void
     {
-        $this->cartFacade->setPaymentModule(new CheckoutDTO(
-            cart: $this->cartFacade->getOrCreateFromSession(),
-            paymentModuleId: $moduleId,
-        ));
+        $this->notice = null;
+        $cart = $this->cartFacade->getOrCreateFromSession();
+
+        // A click on the card already chosen keeps the method picked in it: only a module
+        // that was not chosen yet gets its default one written.
+        $preselected = $moduleId === $cart->getPaymentModuleId()
+            ? $cart->getCustomerPaymentMethodId()
+            : $this->storedMethodToPreselect($this->moduleById($moduleId));
+
+        try {
+            $this->cartFacade->setPaymentModule(new CheckoutDTO(
+                cart: $cart,
+                paymentModuleId: $moduleId,
+                customerPaymentMethodId: $preselected,
+            ));
+        } catch (CustomerPaymentMethodException) {
+            // The method listed a moment ago cannot be paid with any more (it expired, or
+            // was forgotten from the account): the module is chosen all the same, and the
+            // buyer pays with a new method until they pick another.
+            $this->cartFacade->setPaymentModule(new CheckoutDTO(
+                cart: $cart,
+                paymentModuleId: $moduleId,
+            ));
+            $this->notice = 'stored_method_refused';
+        }
 
         $previousModuleId = $this->paymentModuleId;
-        $this->paymentModuleId = $this->cartFacade->getPaymentModuleId();
+        $this->partsView = null;
+        $this->refillFromTheCart();
 
         // The options picked belong to the module they were picked for.
         if ($previousModuleId !== $this->paymentModuleId) {
@@ -231,5 +454,19 @@ class Base
         }
 
         $this->emit('updateNextButton');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function moduleById(int $moduleId): array
+    {
+        foreach ($this->getModules() as $module) {
+            if ((int) ($module['id'] ?? 0) === $moduleId && ($module['valid'] ?? false)) {
+                return $module;
+            }
+        }
+
+        return [];
     }
 }

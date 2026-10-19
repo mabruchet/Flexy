@@ -22,6 +22,7 @@ use FlexyBundle\Service\CheckoutTrail;
 use FlexyBundle\Service\GuestCheckoutGate;
 use FlexyBundle\Service\GuestOrderTracking;
 use FlexyBundle\Service\GuestOrderView;
+use FlexyBundle\Service\InstantPaymentParts;
 use FlexyBundle\Service\PlacedOrderMemory;
 use FlexyBundle\Service\PrefetchRequest;
 use Propel\Runtime\Exception\PropelException;
@@ -47,6 +48,8 @@ use Thelia\Domain\Checkout\Service\CheckoutProgressionService;
 use Thelia\Domain\Customer\Service\AuthenticationReturnUrl;
 use Thelia\Domain\Localization\Service\LangService;
 use Thelia\Domain\Order\Exception\StockShortageException;
+use Thelia\Domain\Payment\Exception\StoredMethodPaymentRateLimitedException;
+use Thelia\Log\Tlog;
 use Thelia\Model\Cart;
 use Thelia\Model\CheckoutStep;
 use Thelia\Model\Order;
@@ -270,6 +273,7 @@ class CheckoutController extends FlexyController
         CheckoutStockRefusal $stockRefusal,
         GuestCheckoutGate $guestCheckoutGate,
         CheckoutStepRouteResolver $routes,
+        InstantPaymentParts $paymentParts,
     ): Response {
         $cart = $cartFacade->getCartFromSession();
 
@@ -279,6 +283,11 @@ class CheckoutController extends FlexyController
             if (null === $cart) {
                 throw new EmptyCartException();
             }
+
+            // A cart the instant payment means (gift card, wallet) pay whole names no
+            // provider, and the placement needs a payment module: the one the core makes
+            // the module of such an order is written, as the payment step does on its own.
+            $paymentParts->settleThePaymentModuleOfTheCart($cart);
 
             // Replayed here and not only on the step that leads to this one: on a
             // one-page checkout the cart can lose its last shippable line after the
@@ -309,9 +318,21 @@ class CheckoutController extends FlexyController
             );
 
             // A gateway form page answers 200, a hosted payment page is reached through the
-            // redirection the module answers with: both are where the buyer goes next.
-            if ($response instanceof Response && ($response->getStatusCode() === 200 || $response->isRedirection())) {
-                return $response;
+            // redirection the module answers with: both are where the buyer goes next. A 200
+            // with nothing in it is a module saying it settled the payment on the spot, and
+            // there is no page to show: sent on as it is, it was a blank screen.
+            if ($response instanceof Response) {
+                if ($response->isRedirection()) {
+                    return $response;
+                }
+
+                if (200 === $response->getStatusCode()) {
+                    if (!$this->isBlank($response)) {
+                        return $response;
+                    }
+
+                    Tlog::getInstance()->warning(\sprintf('Payment module %d answered the payment with an empty page: treated as paid on the spot.', (int) $cart->getPaymentModuleId()));
+                }
             }
 
             // A payment that needs no gateway (a cheque, a bank transfer, a gift card
@@ -331,6 +352,14 @@ class CheckoutController extends FlexyController
         } catch (StockShortageException $e) {
             // The pre-check above covers the stock read before the placement; this one is the stock lost during it.
             throw $stockRefusal->answer($e, $routes->pathFor(CheckoutStep::CODE_CART), $this->getRequest()->getSession());
+        } catch (StoredMethodPaymentRateLimitedException) {
+            // Paid with a saved method too often this hour: the core refused before any
+            // order was written. The buyer goes back to the payment step, where a new
+            // method is still a way to pay; nothing of the limit's mechanics is shown.
+            $message = $this->translator->trans('Too many payments with a saved payment method in a short time. Please try again later, or pay with a new payment method.');
+            $this->addFlash('error', $message);
+
+            throw new RedirectException($routes->pathFor(CheckoutStep::CODE_PAYMENT), Response::HTTP_FOUND, $message);
         } catch (InvalidPaymentException $e) {
             // The payment mode chosen cannot take this order any more (a module that went unavailable, a
             // mode a module refuses for the cart, a gift card that can no longer pay its share): the buyer
@@ -450,6 +479,17 @@ class CheckoutController extends FlexyController
             'failed_order_id' => $order?->getId(),
             'failed_order_message' => $request->query->get('message'),
         ]);
+    }
+
+    /**
+     * A response the browser has nothing to render from. A streamed or file response has
+     * no content to read and is not blank.
+     */
+    private function isBlank(Response $response): bool
+    {
+        $content = $response->getContent();
+
+        return \is_string($content) && '' === trim($content);
     }
 
     /**

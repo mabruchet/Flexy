@@ -93,6 +93,7 @@ The points are part of the theme's public surface: their names and parameters ar
 | `checkout.top`, `checkout.bottom` | Every checkout step | — |
 | `checkout.payment.extra` | Under the payment method the buyer chose, after its options | `module` (id), `code`, `optionChoices` |
 | `checkout.summary.bottom` | Order summary of the cart and checkout steps, under the total, in a live component: for a module paying part of the order another way (gift card form, amount paid, amount left to pay) | `summary` (the figures the summary shows) |
+| `checkout.payment.parts` | In the line of each instant payment means (gift card, credit note, wallet) of the payment step | `module` (id), `amount` (what it applies to the cart, a decimal string) |
 | `checkout-identify.form.bottom` | Identification step | `next_step_url` |
 | `order-placed.top`, `order-placed.bottom` | Order confirmation | — |
 | `login.form.top`, `login.form.bottom`, `register.form.top`, `register.form.bottom` | Login and registration forms | — |
@@ -125,6 +126,22 @@ $choices = $request->getSession()->get('payment_module_option_choices', []);
 ```
 
 No entry for a group means the buyer picked nothing in it: the module applies its default. What does not fit an option — a saved card to name, a notice — goes in the `checkout.payment.extra` hook, rendered under the chosen method only. That hook sits in a live component, where a `<script>` does not run on a re-render: a module that needs a script on the payment step loads it from `layout.head.checkout-payment` and `layout.head.checkout-onepage`.
+
+### Stored payment methods and payment in several parts
+
+A payment module that implements `Thelia\Module\PaymentModuleWithStoredMethodsInterface` gets the buyer's saved methods in its card, from the `stored_methods` option group the core adds to `GET /api/front/payment/modules`: one radio per usable method (the default one first, with its expiry) and one to pay with a new method. The method is written on the cart through the core, with `customerPaymentMethodId` on `CartFacade::setPaymentModule()`, never in the session store of the options above; the core checks that it is the buyer's, stored through the chosen module and not expired. The default method is preselected when the module is chosen, and a click on the card already chosen keeps the method picked in it. A buyer over the hourly allowance of payments with a stored method (`StoredMethodPaymentRateLimitedException`) is sent back to the payment step with a message, before any order is written.
+
+A module that implements `Thelia\Module\InstantPaymentModuleInterface` pays a part of the order inside the shop. The core keeps the buyer's choice with the module and only asks it how much it applied, so applying a part is the module's job, and the theme reads the result:
+
+- Each instant means has a line in the "Pay part of your order with" block of the payment step, with the amount it applies. It draws what it needs there (a code field, a button) from the `checkout.payment.parts` hook, which gets `module` (its id) and `amount`. The hook is called once per instant module, always under the same name: the handler compares `module` with its own module id and returns an empty string for the others, or its fragment shows up in every line.
+- `amount` is a decimal string, never formatted: `"0"` when the module applies nothing; the amount the core plans for that module (capped at what is still due, six decimals, such as `"50.500000"`) when the composition holds; the module's own answer, trimmed, when the core refuses the composition. Format it for display, and do not feed it back into a calculation.
+- Once the module has changed its part, the payment step reads the composition again when the `PAYMENT_PARTS_CHANGED` live event (`FlexyBundle\Event\CheckoutEvents::PAYMENT_PARTS_CHANGED`) is emitted. The event only makes the step read again: the change is made first, by the module, in one of two ways.
+  - A live component of the module whose `LiveAction` writes the change and then calls `$this->emit(CheckoutEvents::PAYMENT_PARTS_CHANGED)`. A live action carries its own CSRF protection.
+  - A plain form posted to a controller of the module, with a CSRF token; the controller writes the change and redirects to the payment step, which reads everything on load. No event is needed.
+- `data-action="live#emit" data-live-event-param="PAYMENT_PARTS_CHANGED"` on its own changes nothing on the server: it only serves after a change made elsewhere.
+- When the parts stop covering the order, a cart whose payment module is an instant means is left without payment module, and the buyer picks a provider again.
+- The block then shows what is left to pay, from the core's composition (`OrderPaymentComposer`), and the payment methods offered are the ones that can charge that balance (`BalanceChargingPaymentModuleInterface`).
+- A part that covers the order whole leaves no payment method to choose: the instant means that carries the order is written as the payment module of the cart, and the order is placed without a provider.
 
 ### Replacing the product search
 

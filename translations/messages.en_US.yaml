@@ -621,3 +621,13 @@ On eligible orders: On eligible orders
 '%products% cannot be shipped to this address. Remove them from your cart or choose another address.': "%products% cannot be shipped to this address. Remove them from your cart or choose another address."
 'Not available for your address': "Not available for your address"
 'Nothing was added to your cart: a product cannot be delivered to your address. Remove its line to add the others.': "Nothing was added to your cart: a product cannot be delivered to your address. Remove its line to add the others."
+'This saved payment method can no longer be used: choose another or pay with a new one.': 'This saved payment method can no longer be used: choose another or pay with a new one.'
+Pay part of your order with: Pay part of your order with
+'Nothing is left to pay: your order is paid in full with the means above.': 'Nothing is left to pay: your order is paid in full with the means above.'
+Left to pay: Left to pay
+'The payment method you chose cannot be combined with another payment means: choose another one.': 'The payment method you chose cannot be combined with another payment means: choose another one.'
+Choose how to pay the rest of your order.: Choose how to pay the rest of your order.
+Expires %date%: Expires %date%
+Default: Default
+Too many payments with a saved payment method in a short time. Please try again later, or pay with a new payment method.: Too many payments with a saved payment method in a short time. Please try again later, or pay with a new payment method.
+'This means cannot be combined with another payment method: remove the part or cover the whole total.': 'This means cannot be combined with another payment method: remove the part or cover the whole total.'
