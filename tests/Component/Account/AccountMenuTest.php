@@ -80,6 +80,45 @@ final class AccountMenuTest extends WebIntegrationTestCase
         );
     }
 
+    public function testBothMenusAreNavigationsLabelledForAssistiveTechnology(): void
+    {
+        $crawler = $this->client->request('GET', '/account');
+
+        self::assertCount(1, $crawler->filter('.Subheader--account nav[aria-label="My account"] .Subheader-links'));
+        self::assertCount(1, $crawler->filter('.HeaderProfile nav[aria-label="My account"] #HeaderProfile-dropdown'));
+        self::assertCount(3, $crawler->filter('nav[aria-label="My account"]'), 'Sub-header, dropdown and mobile drawer.');
+    }
+
+    public function testTheEntryOfThePageBeingShownIsTheCurrentOneInBothMenus(): void
+    {
+        $crawler = $this->client->request('GET', '/account/orders');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame(['/account/orders'], $this->currentLinks($crawler, '.Subheader-links'));
+        self::assertSame(['/account/orders'], $this->currentLinks($crawler, '#HeaderProfile-dropdown'));
+        self::assertSame(['/account/orders'], $this->currentLinks($crawler, '.MobileDrawer'));
+    }
+
+    public function testTheCurrentEntryFollowsThePageAndIgnoresTheQueryString(): void
+    {
+        $crawler = $this->client->request('GET', '/account/orders?page=2');
+
+        self::assertSame(['/account/orders'], $this->currentLinks($crawler, '#HeaderProfile-dropdown'));
+
+        $crawler = $this->client->request('GET', '/account');
+
+        self::assertSame(['/account'], $this->currentLinks($crawler, '.Subheader-links'));
+        self::assertSame(['/account'], $this->currentLinks($crawler, '#HeaderProfile-dropdown'));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function currentLinks(Crawler $crawler, string $menu): array
+    {
+        return $crawler->filter($menu.' a[aria-current="page"]')->each(static fn (Crawler $link): string => (string) $link->attr('href'));
+    }
+
     /**
      * @return list<string>
      */
