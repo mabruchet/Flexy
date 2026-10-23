@@ -138,3 +138,11 @@ Currency: Valuta
 'Expired (valid until %date%)': 'Scaduto (valido fino a %date%)'
 'Default': 'Predefinito'
 'Expires %date%': 'Scade il %date%'
+
+# Returns of the customer (account)
+'My returns': 'I miei resi'
+'You have no returns yet': 'Non hai ancora nessun reso'
+'This order has been cancelled and can no longer be returned.': 'Questo ordine è stato annullato e non può più essere reso.'
+'This order has already been refunded and can no longer be returned.': 'Questo ordine è già stato rimborsato e non può più essere reso.'
+'This order has not been paid yet and cannot be returned.': 'Questo ordine non è ancora stato pagato e non può essere reso.'
+'Another request is being processed on this order, please try again.': "È in corso un'altra richiesta su questo ordine, riprova."
