@@ -643,4 +643,4 @@ Too many payments with a saved payment method in a short time. Please try again 
 'A payment method you choose to keep while paying an order will be listed here.': 'A payment method you choose to keep while paying an order will be listed here.'
 'Are you sure you want to delete this payment method ?': 'Are you sure you want to delete this payment method ?'
 'Are you sure you want to choose this payment method by default ?': 'Are you sure you want to choose this payment method by default ?'
-'Expired on %date%': 'Expired on %date%'
+'Expired (valid until %date%)': 'Expired (valid until %date%)'

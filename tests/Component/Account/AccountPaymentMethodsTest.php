@@ -14,14 +14,18 @@ declare(strict_types=1);
 
 namespace FlexyBundle\Tests\Component\Account;
 
+use FlexyBundle\Tests\Support\ThrowingStoredMethodsPaymentModule;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Routing\RouterInterface;
+use Thelia\Core\Event\TheliaEvents;
 use Thelia\Model\Customer;
 use Thelia\Model\CustomerPaymentMethod;
 use Thelia\Model\CustomerPaymentMethodQuery;
 use Thelia\Model\Map\CustomerPaymentMethodTableMap;
 use Thelia\Model\Module;
+use Thelia\Model\ModuleQuery;
+use Thelia\Module\BaseModule;
 use Thelia\Test\FixtureFactory;
 use Thelia\Test\WebIntegrationTestCase;
 use Thelia\Tests\Support\Flexy\CustomerSessionInjector;
@@ -63,6 +67,7 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
         $this->injector->clear();
         $this->getService(EventDispatcherInterface::class)->removeSubscriber($this->injector);
         $this->uninstallTheStoredMethodsPaymentModule(static::getContainer());
+        static::getContainer()->set('module.'.ThrowingStoredMethodsPaymentModule::getModuleCode(), null);
 
         parent::tearDown();
     }
@@ -111,6 +116,74 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
 
         self::assertGreaterThanOrEqual(1, $first->filter(self::MENU_LINK)->count());
         self::assertCount(0, $second->filter(self::MENU_LINK), 'A worker serves many requests: a module switched off in between is no longer offered.');
+    }
+
+    public function testACustomerHoldingAMethodKeepsThePageWhenItsModuleStoppedOfferingThem(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        StoredMethodsPaymentModule::$offersStoredMethods = false;
+        $customer = $this->signedInCustomer();
+        $this->methodOf($customer, $module, 'Visa ending 4242', null, true);
+        $this->methodOf($customer, $module, 'Mastercard ending 1111');
+
+        $menu = $this->client->request('GET', '/account');
+        self::assertGreaterThanOrEqual(2, $menu->filter(self::MENU_LINK)->count());
+
+        $page = $this->client->request('GET', '/account/payment-methods');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(2, $page->filter('[data-testid="payment-method"]'));
+        self::assertCount(0, $page->filter('[data-modal="confirmDefaultPaymentMethod"]'), 'A method nothing can pay with any more is not offered as the default.');
+        self::assertCount(2, $page->filter('[data-modal="confirmDeletePaymentMethod"]'), 'Deleting stays possible.');
+    }
+
+    public function testAMethodOfAModuleThatStoppedOfferingThemCanStillBeDeleted(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        StoredMethodsPaymentModule::$offersStoredMethods = false;
+        $method = $this->methodOf($this->signedInCustomer(), $module, 'Visa ending 4242');
+
+        $this->client->request('POST', $this->url('account_payment_method_delete', ['methodId' => $method->getId()]), ['_token' => $this->token()]);
+
+        self::assertResponseRedirects('/account/payment-methods?delete_success=1');
+        self::assertFalse($this->stillStored($method));
+        self::assertSame([(int) $method->getId()], StoredMethodsPaymentModule::$forgottenMethodIds, 'The provider is still told: the core asks any module that implements the interface.');
+    }
+
+    public function testACustomerHoldingAMethodOfADeactivatedModuleKeepsThePageAndCanDeleteIt(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        $customer = $this->signedInCustomer();
+        $method = $this->methodOf($customer, $module, 'Visa ending 4242', null, true);
+        $this->methodOf($customer, $module, 'Mastercard ending 1111');
+        $module->setActivate(0)->save($this->getPropelConnection());
+
+        $menu = $this->client->request('GET', '/account');
+        self::assertGreaterThanOrEqual(1, $menu->filter(self::MENU_LINK)->count());
+
+        $page = $this->client->request('GET', '/account/payment-methods');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Visa ending 4242', $page->text());
+        self::assertCount(0, $page->filter('[data-modal="confirmDefaultPaymentMethod"]'), 'A method of a deactivated module is not offered as the default.');
+
+        $this->client->request('POST', $this->url('account_payment_method_delete', ['methodId' => $method->getId()]), ['_token' => $this->token()]);
+
+        self::assertResponseRedirects('/account/payment-methods?delete_success=1');
+        self::assertFalse($this->stillStored($method));
+    }
+
+    public function testAMethodOfAnotherCustomerOpensNothingToACustomerWithNone(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        StoredMethodsPaymentModule::$offersStoredMethods = false;
+        $this->methodOf($this->factory->customer($this->factory->customerTitle()), $module, 'Theirs');
+        $this->signedInCustomer();
+
+        $menu = $this->client->request('GET', '/account');
+        self::assertCount(0, $menu->filter(self::MENU_LINK));
+
+        $this->client->request('GET', '/account/payment-methods');
+        self::assertResponseStatusCodeSame(404);
     }
 
     public function testThePageIsNotFoundWithoutAModuleThatKeepsPaymentMethods(): void
@@ -190,7 +263,7 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
 
         $crawler = $this->client->request('GET', '/account/payment-methods');
 
-        self::assertStringContainsString('Expired on 01/2020', $crawler->filter('[data-testid="payment-method"]')->text());
+        self::assertStringContainsString('Expired (valid until 01/2020)', $crawler->filter('[data-testid="payment-method"]')->text());
     }
 
     public function testACustomerWithoutAMethodSeesAMessage(): void
@@ -254,7 +327,7 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
 
         $this->client->request('POST', $this->url('account_payment_method_delete', ['methodId' => $theirs->getId()]), ['_token' => $token]);
 
-        self::assertResponseStatusCodeSame(404);
+        self::assertResponseRedirects('/account/payment-methods?error=1', null, 'A stranger\'s method answers like a missing one.');
         self::assertTrue($this->stillStored($theirs));
         self::assertSame([], StoredMethodsPaymentModule::$forgottenMethodIds, 'The provider was not asked about a stranger\'s method.');
     }
@@ -267,7 +340,12 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
 
         $this->client->request('POST', $this->url('account_payment_method_delete', ['methodId' => 987654321]), ['_token' => $token]);
 
-        self::assertResponseStatusCodeSame(404);
+        self::assertResponseRedirects('/account/payment-methods?error=1', null, 'A double click on a deletion lands on the list, not on an error page.');
+        self::assertSame([], StoredMethodsPaymentModule::$forgottenMethodIds);
+
+        $this->client->request('POST', $this->url('account_payment_method_default', ['methodId' => 987654321]), ['_token' => $token]);
+
+        self::assertResponseRedirects('/account/payment-methods?error=1');
     }
 
     public function testADefaultIsChosenAndTheFormerOneIsLeft(): void
@@ -300,9 +378,116 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
 
         $this->client->request('POST', $this->url('account_payment_method_default', ['methodId' => $theirOther->getId()]), ['_token' => $token]);
 
-        self::assertResponseStatusCodeSame(404);
+        self::assertResponseRedirects('/account/payment-methods?error=1');
         self::assertTrue($this->reread($theirDefault)->getIsDefault());
         self::assertFalse($this->reread($theirOther)->getIsDefault());
+    }
+
+    public function testAnExpiredMethodIsNotOfferedAsTheDefaultNorAcceptedAsOne(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        $customer = $this->signedInCustomer();
+        $current = $this->methodOf($customer, $module, 'Current default', null, true);
+        $expired = $this->methodOf($customer, $module, 'Old card', '2020-01-31');
+
+        $page = $this->client->request('GET', '/account/payment-methods');
+
+        self::assertCount(0, $page->filter('[data-modal="confirmDefaultPaymentMethod"]'), 'A card that expired cannot be chosen.');
+        self::assertCount(2, $page->filter('[data-modal="confirmDeletePaymentMethod"]'));
+
+        $this->client->request('POST', $this->url('account_payment_method_default', ['methodId' => $expired->getId()]), ['_token' => $this->token()]);
+
+        self::assertResponseRedirects('/account/payment-methods?error=1');
+        self::assertFalse($this->reread($expired)->getIsDefault());
+        self::assertTrue($this->reread($current)->getIsDefault());
+    }
+
+    public function testAMethodOfAModuleThatCannotPayAnyMoreIsNotAcceptedAsTheDefault(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        $customer = $this->signedInCustomer();
+        $current = $this->methodOf($customer, $module, 'Current default', null, true);
+        $other = $this->methodOf($customer, $module, 'Other');
+        $token = $this->token();
+
+        StoredMethodsPaymentModule::$offersStoredMethods = false;
+        $this->client->request('POST', $this->url('account_payment_method_default', ['methodId' => $other->getId()]), ['_token' => $token]);
+        self::assertResponseRedirects('/account/payment-methods?error=1', null, 'The module no longer offers stored methods.');
+
+        StoredMethodsPaymentModule::$offersStoredMethods = true;
+        $module->setActivate(0)->save($this->getPropelConnection());
+        $this->client->request('POST', $this->url('account_payment_method_default', ['methodId' => $other->getId()]), ['_token' => $token]);
+        self::assertResponseRedirects('/account/payment-methods?error=1', null, 'The module is deactivated.');
+
+        self::assertFalse($this->reread($other)->getIsDefault());
+        self::assertTrue($this->reread($current)->getIsDefault());
+    }
+
+    public function testAProviderFailureThatQuotesASecretIsNeverShown(): void
+    {
+        $module = $this->installTheThrowingModule();
+        $method = $this->methodOf($this->signedInCustomer(), $module, 'Stuck with it');
+        $token = $this->token();
+
+        $this->client->request('POST', $this->url('account_payment_method_delete', ['methodId' => $method->getId()]), ['_token' => $token]);
+
+        self::assertResponseRedirects('/account/payment-methods?refused=1');
+        self::assertStringNotContainsString('pm_secret', (string) $this->client->getResponse()->getContent());
+        self::assertTrue($this->stillStored($method), 'The provider did not forget it: the shop keeps it.');
+
+        $crawler = $this->client->followRedirect();
+
+        self::assertStringNotContainsString('pm_secret', (string) $this->client->getResponse()->getContent());
+        self::assertCount(1, $crawler->filter('[data-testid="payment-method"]'));
+    }
+
+    public function testAFailureAfterTheDeletionThatQuotesASecretEndsOnTheListWithAnError(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        $customer = $this->signedInCustomer();
+        $this->methodOf($customer, $module, 'Current default', null, true);
+        $other = $this->methodOf($customer, $module, 'Other');
+        $token = $this->token();
+        $failing = static function (): never {
+            throw new \RuntimeException('pm_secret');
+        };
+        $dispatcher = $this->getService(EventDispatcherInterface::class);
+        $dispatcher->addListener(TheliaEvents::CUSTOMER_PAYMENT_METHOD_DELETE, $failing);
+
+        try {
+            $this->client->request('POST', $this->url('account_payment_method_delete', ['methodId' => $other->getId()]), ['_token' => $token]);
+        } finally {
+            $dispatcher->removeListener(TheliaEvents::CUSTOMER_PAYMENT_METHOD_DELETE, $failing);
+        }
+
+        self::assertResponseRedirects('/account/payment-methods?error=1');
+        self::assertStringNotContainsString('pm_secret', (string) $this->client->getResponse()->getContent());
+    }
+
+    public function testTheButtonsOfACardNameTheCardAndTheDefaultOneIsPressed(): void
+    {
+        $module = $this->installTheStoredMethodsPaymentModule(static::getContainer(), $this->getPropelConnection());
+        $customer = $this->signedInCustomer();
+        $this->methodOf($customer, $module, 'Visa ending 4242', null, true);
+        $this->methodOf($customer, $module, 'Mastercard ending 1111');
+
+        $cards = $this->client->request('GET', '/account/payment-methods')->filter('[data-testid="payment-method"]');
+
+        self::assertCount(2, $cards);
+
+        foreach ($cards as $card) {
+            $card = new Crawler($card);
+            $titleId = (string) $card->filter('.AddressCard-title')->attr('id');
+            self::assertNotSame('', $titleId);
+            self::assertStringContainsString($titleId, (string) $card->filter('[data-modal="confirmDeletePaymentMethod"]')->attr('aria-describedby'));
+            self::assertSame($titleId, $card->filter('.Favorite')->attr('aria-describedby'));
+        }
+
+        self::assertSame('true', $cards->eq(0)->filter('.Favorite')->attr('aria-pressed'));
+        self::assertSame('false', $cards->eq(1)->filter('.Favorite')->attr('aria-pressed'));
+        self::assertSame('true', $cards->eq(0)->filter('.Favorite')->attr('aria-disabled'), 'The default method has no action: it says so.');
+        self::assertNull($cards->eq(1)->filter('.Favorite')->attr('aria-disabled'));
+        self::assertNotSame($cards->eq(0)->filter('.AddressCard-title')->attr('id'), $cards->eq(1)->filter('.AddressCard-title')->attr('id'));
     }
 
     public function testBothWritesRefuseAMissingOrForgedToken(): void
@@ -353,6 +538,30 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
         self::assertNotSame('', $crawler->filter('#confirmDefaultPaymentMethod input[name="_token"]')->attr('value'));
         self::assertSame('/account/payment-methods/'.$method->getId().'/default', $crawler->filter('[data-modal="confirmDefaultPaymentMethod"]')->attr('data-confirm'));
         self::assertCount(1, $crawler->filter('[data-modal="confirmDefaultPaymentMethod"]'), 'The default method has nothing to confirm.');
+    }
+
+    private function installTheThrowingModule(): Module
+    {
+        $connection = $this->getPropelConnection();
+        $code = ThrowingStoredMethodsPaymentModule::getModuleCode();
+        $module = ModuleQuery::create()->findOneByCode($code, $connection);
+
+        if (!$module instanceof Module) {
+            $module = (new Module())
+                ->setCode($code)
+                ->setFullNamespace(ThrowingStoredMethodsPaymentModule::class)
+                ->setVersion('1.0.0')
+                ->setType(BaseModule::PAYMENT_MODULE_TYPE)
+                ->setCategory('payment')
+                ->setActivate(BaseModule::IS_ACTIVATED);
+            $module->save($connection);
+        }
+
+        $instance = new ThrowingStoredMethodsPaymentModule();
+        $instance->setContainer(static::getContainer());
+        static::getContainer()->set('module.'.$code, $instance);
+
+        return $module;
     }
 
     private function signedInCustomer(): Customer

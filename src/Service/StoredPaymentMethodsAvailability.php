@@ -17,18 +17,25 @@ namespace FlexyBundle\Service;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Thelia\Core\Security\SecurityContext;
 use Thelia\Domain\Payment\CustomerPaymentMethodService;
+use Thelia\Model\CustomerPaymentMethodQuery;
 use Thelia\Model\Module;
 use Thelia\Model\ModuleQuery;
 use Thelia\Module\BaseModule;
 
 /**
- * Whether an active payment module keeps payment methods for its customers right now.
+ * Whether the account offers the page of the saved payment methods.
  *
- * It decides whether the account offers the page of the saved payment methods, so that
- * the menu never links to a page the shop has nothing to put on. The question is put to
- * every active payment module, through the core rule the registration and the checkout
- * apply too: a module can depend on its configuration or on its provider account.
+ * It does when an active payment module keeps payment methods for its customers right
+ * now, or when the signed-in customer already holds at least one, whatever its module
+ * became since (switched off, or no longer offering them): the customer must be able to
+ * see and remove what the shop keeps for them. Otherwise the menu would link to a page the
+ * shop has nothing to put on.
+ *
+ * The modules are asked through the core rule the registration and the checkout apply
+ * too: a module can depend on its configuration or on its provider account. The customer
+ * is looked up by one bounded existence query, never by a list.
  *
  * The account menu is built twice on a page (sub-header and profile dropdown) and the
  * modules are asked at each build, so the answer is kept for the request that asked.
@@ -42,13 +49,14 @@ final class StoredPaymentMethodsAvailability
 
     public function __construct(
         private readonly RequestStack $requestStack,
+        private readonly SecurityContext $securityContext,
         private readonly CustomerPaymentMethodService $paymentMethodService,
         private readonly LoggerInterface $logger,
     ) {
         $this->answers = new \WeakMap();
     }
 
-    public function isOffered(): bool
+    public function isAvailable(): bool
     {
         $request = $this->requestStack->getCurrentRequest();
 
@@ -59,8 +67,20 @@ final class StoredPaymentMethodsAvailability
         return $this->answers[$request] ??= $this->ask();
     }
 
+    /**
+     * Whether the module offers to keep new payment methods right now.
+     */
+    public function isOfferedBy(Module $module): bool
+    {
+        return $this->offers($module);
+    }
+
     private function ask(): bool
     {
+        if ($this->customerHoldsAMethod()) {
+            return true;
+        }
+
         $modules = ModuleQuery::create()
             ->filterByType(BaseModule::PAYMENT_MODULE_TYPE)
             ->filterByActivate(BaseModule::IS_ACTIVATED)
@@ -93,5 +113,16 @@ final class StoredPaymentMethodsAvailability
 
             return false;
         }
+    }
+
+    private function customerHoldsAMethod(): bool
+    {
+        if (!$this->securityContext->hasAuthenticatedCustomerUser()) {
+            return false;
+        }
+
+        $customerId = $this->securityContext->getCustomerUser()?->getId();
+
+        return null !== $customerId && CustomerPaymentMethodQuery::create()->filterByCustomerId($customerId)->exists();
     }
 }

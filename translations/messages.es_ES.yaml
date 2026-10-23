@@ -135,6 +135,6 @@ Currency: Moneda
 'A payment method you choose to keep while paying an order will be listed here.': 'Un método de pago que decida conservar al pagar un pedido aparecerá aquí.'
 'Are you sure you want to delete this payment method ?': '¿Está seguro de que desea eliminar este método de pago?'
 'Are you sure you want to choose this payment method by default ?': '¿Está seguro de que desea elegir este método de pago como predeterminado?'
-'Expired on %date%': 'Caducó el %date%'
+'Expired (valid until %date%)': 'Caducado (válido hasta %date%)'
 'Default': 'Predeterminado'
 'Expires %date%': 'Caduca el %date%'

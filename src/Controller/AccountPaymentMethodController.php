@@ -29,7 +29,6 @@ use Thelia\Domain\Payment\Exception\CustomerPaymentMethodException;
 use Thelia\Domain\Payment\Exception\PaymentMethodNotOwnedException;
 use Thelia\Domain\Payment\Exception\StoredMethodRefusedException;
 use Thelia\Model\Customer;
-use Thelia\Model\CustomerPaymentMethod;
 
 /**
  * The payment methods a customer asked the shop to keep, in the customer account.
@@ -38,10 +37,13 @@ use Thelia\Model\CustomerPaymentMethod;
  * for why the account API is not used). The two writes go through the core service and not
  * through a model, which asks the provider before it forgets a method and keeps the default
  * unique. Each is a POST carrying a CSRF token and answered by a redirect, like the
- * address book. A method of another customer answers as one that does not exist.
+ * address book. A method of another customer answers as one that does not exist: like a
+ * missing one (a double click on a deletion), it sends back to the list with an error.
  *
- * The page answers 404 when no active payment module keeps payment methods, the same
- * rule that leaves its link out of the account menu.
+ * The page answers 404 when no active payment module keeps payment methods and the customer
+ * holds none, the same rule that leaves its link out of the account menu. The core lets a
+ * customer remove a method whatever became of its module, and set it as default too: the
+ * page offers the default choice only for a method its module still offers to use.
  */
 #[Route('/account/payment-methods', name: 'account_payment_method')]
 class AccountPaymentMethodController extends FlexyController
@@ -53,7 +55,7 @@ class AccountPaymentMethodController extends FlexyController
     {
         $customer = $this->signedInCustomer();
 
-        if (!$availability->isOffered()) {
+        if (!$availability->isAvailable()) {
             throw new NotFoundHttpException();
         }
 
@@ -69,19 +71,28 @@ class AccountPaymentMethodController extends FlexyController
     ): RedirectResponse {
         $customer = $this->signedInCustomer();
         $this->checkToken($csrfTokenManager, $request);
-        $method = $this->ownedMethod($paymentMethodService, $customer, $methodId);
+        $method = $paymentMethodService->findOwned($customer, $methodId);
+
+        if (null === $method) {
+            return $this->listWithError();
+        }
 
         try {
             $paymentMethodService->forget($customer, $method);
         } catch (StoredMethodRefusedException) {
             // What the provider said is for the logs of the core, never for the page.
             return $this->generateRedirect($this->generateUrl('account_payment_methods', ['refused' => true]));
-        } catch (PaymentMethodNotOwnedException $exception) {
-            throw new NotFoundHttpException('No such payment method.', $exception);
+        } catch (PaymentMethodNotOwnedException) {
+            return $this->listWithError();
         } catch (CustomerPaymentMethodException $exception) {
             $this->logger->error(\sprintf('Error during payment method deletion process: %s.', $exception::class));
 
-            return $this->generateRedirect($this->generateUrl('account_payment_methods', ['error' => true]));
+            return $this->listWithError();
+        } catch (\Throwable $throwable) {
+            // The class only: what a provider says may quote a token.
+            $this->logger->error(\sprintf('Error during payment method deletion process: %s.', $throwable::class));
+
+            return $this->listWithError();
         }
 
         return $this->generateRedirect($this->generateUrl('account_payment_methods', ['delete_success' => true]));
@@ -90,22 +101,32 @@ class AccountPaymentMethodController extends FlexyController
     #[Route('/{methodId}/default', name: '_default', requirements: ['methodId' => '\d+'], methods: ['POST'])]
     public function makeDefault(
         CustomerPaymentMethodService $paymentMethodService,
+        AccountPaymentMethods $accountPaymentMethods,
         CsrfTokenManagerInterface $csrfTokenManager,
         Request $request,
         int $methodId,
     ): RedirectResponse {
         $customer = $this->signedInCustomer();
         $this->checkToken($csrfTokenManager, $request);
-        $method = $this->ownedMethod($paymentMethodService, $customer, $methodId);
+        $method = $paymentMethodService->findOwned($customer, $methodId);
+
+        // The page offers no such choice for a method the checkout would not offer: a forged POST gets no more.
+        if (null === $method || !$accountPaymentMethods->isUsable($method)) {
+            return $this->listWithError();
+        }
 
         try {
             $paymentMethodService->setDefault($customer, $method);
-        } catch (PaymentMethodNotOwnedException $exception) {
-            throw new NotFoundHttpException('No such payment method.', $exception);
+        } catch (PaymentMethodNotOwnedException) {
+            return $this->listWithError();
         } catch (CustomerPaymentMethodException $exception) {
             $this->logger->error(\sprintf('Error during default payment method process: %s.', $exception::class));
 
-            return $this->generateRedirect($this->generateUrl('account_payment_methods', ['error' => true]));
+            return $this->listWithError();
+        } catch (\Throwable $throwable) {
+            $this->logger->error(\sprintf('Error during default payment method process: %s.', $throwable::class));
+
+            return $this->listWithError();
         }
 
         return $this->generateRedirect($this->generateUrl('account_payment_methods', ['default_success' => true]));
@@ -130,9 +151,8 @@ class AccountPaymentMethodController extends FlexyController
         }
     }
 
-    private function ownedMethod(CustomerPaymentMethodService $paymentMethodService, Customer $customer, int $methodId): CustomerPaymentMethod
+    private function listWithError(): RedirectResponse
     {
-        return $paymentMethodService->findOwned($customer, $methodId)
-            ?? throw new NotFoundHttpException('No such payment method.');
+        return $this->generateRedirect($this->generateUrl('account_payment_methods', ['error' => true]));
     }
 }

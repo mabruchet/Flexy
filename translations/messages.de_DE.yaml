@@ -620,4 +620,4 @@ Too many payments with a saved payment method in a short time. Please try again 
 'A payment method you choose to keep while paying an order will be listed here.': 'Eine Zahlungsmethode, die Sie beim Bezahlen einer Bestellung speichern, wird hier aufgelistet.'
 'Are you sure you want to delete this payment method ?': 'Sind Sie sicher, dass Sie diese Zahlungsmethode löschen möchten?'
 'Are you sure you want to choose this payment method by default ?': 'Sind Sie sicher, dass Sie diese Zahlungsmethode als Standard festlegen möchten?'
-'Expired on %date%': 'Abgelaufen am %date%'
+'Expired (valid until %date%)': 'Abgelaufen (gültig bis %date%)'
