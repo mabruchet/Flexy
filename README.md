@@ -155,6 +155,30 @@ public function productIds(string $term, string $locale, int $limit): array; // 
 
 The engine only says which products match. The theme keeps the rest: it drops the products a visitor may not see, paginates, and reads the page through the product API. With no sort chosen the results follow the engine's order; a sort chosen in the selector applies to the matches. An engine returning `[]` means no result: the theme does not fall back on its own search.
 
+### Account menu
+
+The account navigation, in the sub-header of the account pages and in the profile dropdown, is gathered from the services implementing `FlexyBundle\AccountMenu\AccountMenuItemProviderInterface`. Autoconfiguration tags them: a module whose `configureServices()` loads its classes with `->autoconfigure()` declares nothing else.
+
+```php
+public function getItems(): iterable; // AccountMenuItem(slug, text, href, position)
+```
+
+A provider decides on the server whether its entries exist and returns none when the feature behind them is off. One that throws, or returns anything but an `AccountMenuItem`, is logged and loses its own entries only.
+
+| Entry | Slug | Position |
+|---|---|---|
+| My profile | `profile` | 100 |
+| My orders | `orders` | 200 |
+| My returns (only when the shop offers returns) | `returns` | 250 |
+| My addresses | `addresses` | 300 |
+| My payment methods (only when available) | `payment-methods` | 400 |
+| My purchase lists | `purchase-lists` | 500 |
+| Quick order | `quick-order` | 600 |
+
+Entries are listed by ascending position, those sharing one in the order their providers were given; the position has no default, so pick one between two of the above to slot in. The slug is the identity of an entry (the sub-header marks as current the one named by its `selected` prop). When two entries share a slug, only one is kept and the other is logged: the entry of a provider the theme does not ship always wins over a shipped one, so a module replaces a native entry by giving its own the same slug. Between two providers of modules, the first one given keeps it.
+
+Migrating: `AccountMenuService::getItems()` now returns a list of `AccountMenuItem` objects instead of arrays. `AccountMenuItem` reads as a read-only array (`item['slug']`, `item['href']`) so a child template written against the old shape keeps working, but that bridge is deprecated: read `item.slug`. The constructor of `AccountMenuService` changed too, it takes the providers, a logger and the request stack where it took the URL generator, the translator and `StoredPaymentMethodsAvailability`: a child theme that builds or decorates the service must follow. The dropdown landmark is now the `<nav id="HeaderProfile-dropdown">` itself (it was a `<ul>` inside a `<nav>`), labelled "My account menu" like the mobile drawer, while the sub-header keeps "My account".
+
 ### Adding a field to the sign-up and account forms
 
 The sign-up form (`flexybundle_form_customer_register_form`) and the account form (`flexybundle_form_customer_update_form`) render every field they hold, a module's included, inside the form and above the submit button. A module adds its field when the form is built, by listening to `TheliaEvents::FORM_AFTER_BUILD.'.'.<form name>` and calling `$event->getForm()->getFormBuilder()->add(...)`. The theme's controllers only read their own fields: the module reads its value on the event the account is saved through, `TheliaEvents::CREATE_CUSTOMER_MINIMAL` for the sign-up and `TheliaEvents::CUSTOMER_UPDATEPROFILE` for the account form.
