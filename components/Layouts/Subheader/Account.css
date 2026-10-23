@@ -9,7 +9,7 @@
 .Subheader-links {
   display: flex;
   width: 100%;
-  /* Six entries since the payment methods joined the account, when a payment module keeps them. */
+  /* Up to seven entries: the payment methods and the returns join the account when the shop offers them. */
   max-width: 60rem;
   flex-direction: column;
   align-items: stretch;
