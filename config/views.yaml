@@ -18,6 +18,7 @@ internal:
     - account
     - account-order
     - account-orders
+    - account-returns
     - account-addresses
     - account-payment-methods
     - address

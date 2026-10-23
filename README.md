@@ -101,6 +101,7 @@ The points are part of the theme's public surface: their names and parameters ar
 | `account-order.top`, `account-order.bottom` | Order detail | `order` |
 | `account-order.item.top`, `account-order.item.bottom` | Each line of an order | `order`, `orderProduct` |
 | `account-order-return.top`, `account-order-return.bottom` | Return request of an order | `order` |
+| `account-returns.top`, `account-returns.bottom` | List of the customer's returns | `orderReturns` (the returns of the page shown) |
 | `account-return.top`, `account-return.bottom` | Return detail | `orderReturn` |
 | `sitemap.urls` | Inside each `<urlset>` of the sitemap | `context`, `lang` |
 
