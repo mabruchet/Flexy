@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'My returns'|trans }}{% endblock %}
+
+{% block body %}
+    {{ theme_hook('account-returns.top', {orderReturns: orderReturns}) }}
+
+    <twig:Layouts:Subheader:Account
+        title="{{ 'My returns'|trans }}"
+        selected="returns"
+        :breadcrumb="[
+            {title: 'My account'|trans, url: path('account_index')},
+            {title: 'My returns'|trans},
+        ]"
+    />
+
+    <div class="container-l pt-6 pb-20 md:pt-11 md:pb-30">
+        {% if orderReturns is not empty %}
+            <ul class="flex flex-col gap-2 list-none p-0 m-0">
+                {% for orderReturn in orderReturns %}
+                    <twig:Organisms:OrderReturnCard:Base :orderReturn="orderReturn" :withOrder="true" />
+                {% endfor %}
+            </ul>
+
+            <div class="flex justify-center mt-10">
+                <twig:Molecules:Pagination:Base
+                    :totalItems="pagination.totalItems"
+                    :itemsPerPage="pagination.itemsPerPage"
+                    :currentPage="pagination.currentPage"
+                />
+            </div>
+        {% else %}
+            <div class="flex flex-col items-center text-center">
+                <div class="w-36 h-auto lg:w-60">
+                    {{ source('assets/images/nothing.svg') }}
+                </div>
+                <h3 class="h3 mt-4 mb-6">{{ 'You have no returns yet'|trans }}</h3>
+            </div>
+        {% endif %}
+    </div>
+
+    {{ theme_hook('account-returns.bottom', {orderReturns: orderReturns}) }}
+{% endblock %}
+
+{% block footer %}
+    <twig:Layouts:Footer:Checkout />
+{% endblock %}
