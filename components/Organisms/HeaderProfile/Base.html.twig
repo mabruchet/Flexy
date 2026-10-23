@@ -24,8 +24,9 @@
         {{ ...stimulus_action(headerProfileController, 'toggle', 'click')|stimulus_action(mobileDrawerController, 'toggle', 'click') }}
     />
 
-    <nav aria-label="{{ 'My account'|trans }}">
-        <ul class="HeaderProfile-dropdown" id="HeaderProfile-dropdown">
+    {# The landmark is the hidden element itself: a nav around a hidden list would stay exposed, empty. #}
+    <nav class="HeaderProfile-dropdown" id="HeaderProfile-dropdown" aria-label="{{ 'My account menu'|trans }}">
+        <ul>
             {% for item in accountItems %}
                 <li class="HeaderProfile-item">
                     <twig:Molecules:MenuItem:Base
@@ -45,7 +46,7 @@
         <strong class="HeaderProfile-greeting">
             {{ 'hy_customer'|trans({'%firstname%': customer.firstname}) }}
         </strong>
-        <nav aria-label="{{ 'My account'|trans }}">
+        <nav aria-label="{{ 'My account menu'|trans }}">
             {% for item in accountItems %}
                 <twig:Molecules:MenuItem:Base
                     href="{{ item.href }}"

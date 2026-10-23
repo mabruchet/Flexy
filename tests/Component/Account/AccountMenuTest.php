@@ -85,8 +85,10 @@ final class AccountMenuTest extends WebIntegrationTestCase
         $crawler = $this->client->request('GET', '/account');
 
         self::assertCount(1, $crawler->filter('.Subheader--account nav[aria-label="My account"] .Subheader-links'));
-        self::assertCount(1, $crawler->filter('.HeaderProfile nav[aria-label="My account"] #HeaderProfile-dropdown'));
-        self::assertCount(3, $crawler->filter('nav[aria-label="My account"]'), 'Sub-header, dropdown and mobile drawer.');
+        self::assertCount(1, $crawler->filter('.HeaderProfile nav#HeaderProfile-dropdown.HeaderProfile-dropdown[aria-label="My account menu"]'), 'The landmark is the hidden element, not a wrapper around it.');
+        self::assertCount(0, $crawler->filter('.HeaderProfile nav > ul.HeaderProfile-dropdown'));
+        self::assertCount(1, $crawler->filter('nav[aria-label="My account"]'), 'Only the sub-header.');
+        self::assertCount(2, $crawler->filter('nav[aria-label="My account menu"]'), 'Dropdown and mobile drawer.');
     }
 
     public function testTheEntryOfThePageBeingShownIsTheCurrentOneInBothMenus(): void
