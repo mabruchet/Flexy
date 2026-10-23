@@ -29,6 +29,7 @@ final class ReturnTranslationsTest extends TestCase
 
     private const array KEYS = [
         'My returns',
+        'My account menu',
         'You have no returns yet',
         'This order has been cancelled and can no longer be returned.',
         'This order has already been refunded and can no longer be returned.',
