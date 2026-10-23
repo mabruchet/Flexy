@@ -640,3 +640,14 @@ Expires %date%: Expire le %date%
 Default: Par défaut
 Too many payments with a saved payment method in a short time. Please try again later, or pay with a new payment method.: Trop de paiements avec un moyen de paiement enregistré en peu de temps. Réessayez plus tard, ou payez avec un nouveau moyen de paiement.
 'This means cannot be combined with another payment method: remove the part or cover the whole total.': 'Ce moyen ne peut pas être combiné avec un autre moyen de paiement : retirez la part ou couvrez tout le total.'
+
+# Payment methods saved by the customer (account)
+'My payment methods': 'Mes moyens de paiement'
+'Your payment method has been deleted': 'Votre moyen de paiement a été supprimé'
+'Your default payment method has been updated': 'Votre moyen de paiement par défaut a été mis à jour'
+'Your payment provider refused to delete this payment method, it has been kept. Please try again later.': 'Votre prestataire de paiement a refusé de supprimer ce moyen de paiement, il a été conservé. Veuillez réessayer plus tard.'
+'You have no saved payment method yet': 'Vous n''avez pas encore de moyen de paiement enregistré'
+'A payment method you choose to keep while paying an order will be listed here.': 'Un moyen de paiement que vous choisissez de conserver en payant une commande sera listé ici.'
+'Are you sure you want to delete this payment method ?': 'Êtes-vous sûr de vouloir supprimer ce moyen de paiement ?'
+'Are you sure you want to choose this payment method by default ?': 'Êtes-vous sûr de vouloir choisir ce moyen de paiement par défaut ?'
+'Expired on %date%': 'Expiré le %date%'

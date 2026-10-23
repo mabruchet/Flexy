@@ -28,6 +28,7 @@ final readonly class AccountMenuService
         private UrlGeneratorInterface $urlGenerator,
         #[Autowire(service: 'translator')]
         private TranslatorInterface $translator,
+        private StoredPaymentMethodsAvailability $storedPaymentMethods,
     ) {
     }
 
@@ -36,7 +37,7 @@ final readonly class AccountMenuService
      */
     public function getItems(): array
     {
-        return [
+        $items = [
             [
                 'slug' => 'profile',
                 'text' => $this->translator->trans('My profile'),
@@ -63,5 +64,17 @@ final readonly class AccountMenuService
                 'href' => $this->urlGenerator->generate('account_quick_order'),
             ],
         ];
+
+        // Decided here, from the shop, and not by a test in the templates: the page exists
+        // only when a payment module keeps payment methods, so the link does too.
+        if ($this->storedPaymentMethods->isOffered()) {
+            array_splice($items, 3, 0, [[
+                'slug' => 'payment-methods',
+                'text' => $this->translator->trans('My payment methods'),
+                'href' => $this->urlGenerator->generate('account_payment_methods'),
+            ]]);
+        }
+
+        return $items;
     }
 }

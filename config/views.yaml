@@ -19,6 +19,7 @@ internal:
     - account-order
     - account-orders
     - account-addresses
+    - account-payment-methods
     - address
     - address-update
 
