@@ -15,7 +15,11 @@ declare(strict_types=1);
 namespace FlexyBundle\Tests\Integration;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
+use FlexyBundle\Service\OrderReturnAttemptLimiter;
 use FlexyBundle\Service\OrderReturnRequestService;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Service\OrderReturnHydrator;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
@@ -29,6 +33,7 @@ use Thelia\Model\OrderReturnQuery;
 use Thelia\Model\OrderStatus;
 use Thelia\Test\FixtureFactory;
 use Thelia\Test\IntegrationTestCase;
+use Thelia\Test\Trait\RecordsSqlQueries;
 
 /**
  * The quota of return requests counts the returns a customer opens, not the mistakes made
@@ -37,6 +42,8 @@ use Thelia\Test\IntegrationTestCase;
  */
 final class OrderReturnRequestQuotaTest extends IntegrationTestCase
 {
+    use RecordsSqlQueries;
+
     private ?string $previousEnabled = null;
 
     protected function setUp(): void
@@ -93,7 +100,36 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
         }
     }
 
-    private function service(ReturnRequestLimiter $limiter): OrderReturnRequestService
+    public function testRefusedRequestsInARowAreBrakedBeforeTheDatabaseIsTouched(): void
+    {
+        [$customer, $order, $line] = $this->paidOrderWithOneLine(1.0);
+        $attempts = new OrderReturnAttemptLimiter(
+            new RateLimiterFactory(['id' => 'attempts', 'policy' => 'sliding_window', 'limit' => 3, 'interval' => '1 hour'], new InMemoryStorage()),
+            new RequestStack(),
+        );
+        $service = $this->service($this->createMock(ReturnRequestLimiter::class), $attempts);
+        $ineligible = [(int) $line->getId() => 5.0];
+
+        for ($refused = 1; $refused <= 3; ++$refused) {
+            try {
+                $service->open($order, $customer, $ineligible, null, 'refund', null);
+                self::fail('More than the ordered quantity was expected to be refused.');
+            } catch (ReturnNotAllowedException) {
+            }
+        }
+
+        $statements = $this->recordSqlQueries(function () use ($service, $order, $customer, $ineligible): void {
+            try {
+                $service->open($order, $customer, $ineligible, null, 'refund', null);
+                self::fail('The fourth attempt was expected to be braked.');
+            } catch (TooManyReturnRequestsException) {
+            }
+        });
+
+        self::assertSame([], $statements, 'A braked attempt takes no lock and runs no query.');
+    }
+
+    private function service(ReturnRequestLimiter $limiter, ?OrderReturnAttemptLimiter $attemptLimiter = null): OrderReturnRequestService
     {
         $container = self::getContainer();
 
@@ -102,6 +138,10 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
             $container->get(OrderReturnHydrator::class),
             $container->get(EventDispatcherInterface::class),
             $limiter,
+            $attemptLimiter ?? new OrderReturnAttemptLimiter(
+                new RateLimiterFactory(['id' => 'attempts', 'policy' => 'no_limit'], new InMemoryStorage()),
+                new RequestStack(),
+            ),
         );
     }
 

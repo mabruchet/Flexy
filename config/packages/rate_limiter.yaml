@@ -1,0 +1,10 @@
+# Submissions of the return request form, accepted or refused. A refused one has already
+# taken row locks on the order lines, so the core's quota of accepted returns does not
+# slow a loop of ineligible posts down. A customer fixing a form needs a handful of
+# tries; an hour of sixty leaves room for several orders and none for a loop.
+framework:
+    rate_limiter:
+        flexy_order_return_attempt:
+            policy: sliding_window
+            limit: 60
+            interval: '1 hour'
