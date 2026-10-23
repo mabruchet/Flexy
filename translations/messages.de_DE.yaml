@@ -440,6 +440,8 @@ Products in this operation: Produkte dieser Aktion
 Sale: Aktion
 Returns: Rücksendungen
 Return %ref%: Rücksendung %ref%
+My returns: Meine Rücksendungen
+You have no returns yet: Sie haben noch keine Rücksendungen
 Request a return: Rücksendung beantragen
 Return request: Rücksendeantrag
 Products to return: Zurückzusendende Produkte
@@ -468,6 +470,10 @@ Too many return requests, please try again later.: Zu viele Rücksendeanträge, 
 The return could not be opened.: Der Rücksendeantrag konnte nicht angelegt werden.
 The product returns feature is disabled.: Rücksendungen werden von diesem Shop nicht angeboten.
 This order cannot be used for a return.: Für diese Bestellung ist keine Rücksendung möglich.
+This order has been cancelled and can no longer be returned.: Diese Bestellung wurde storniert und kann nicht mehr zurückgesendet werden.
+This order has already been refunded and can no longer be returned.: Diese Bestellung wurde bereits erstattet und kann nicht mehr zurückgesendet werden.
+This order has not been paid yet and cannot be returned.: Diese Bestellung wurde noch nicht bezahlt und kann nicht zurückgesendet werden.
+Another request is being processed on this order, please try again.: Für diese Bestellung wird gerade eine andere Anfrage bearbeitet, bitte versuchen Sie es erneut.
 The return window for this order has closed.: Die Rücksendefrist für diese Bestellung ist abgelaufen.
 A virtual product cannot be returned.: Ein digitales Produkt kann nicht zurückgesendet werden.
 The returned quantity must be positive.: Die Rücksendemenge muss größer als null sein.

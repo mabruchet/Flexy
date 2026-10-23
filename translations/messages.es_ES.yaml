@@ -148,3 +148,12 @@ Close: Cerrar
 'See prices for %country%': 'Ver precios para %country%'
 delivery_estimation: Entrega prevista entre el %min% y el %max%
 delivery_estimation_day: Entrega prevista el %date%
+
+
+# Returns of the customer (account)
+'My returns': 'Mis devoluciones'
+'You have no returns yet': 'Aún no tiene ninguna devolución'
+'This order has been cancelled and can no longer be returned.': 'Este pedido ha sido cancelado y ya no se puede devolver.'
+'This order has already been refunded and can no longer be returned.': 'Este pedido ya ha sido reembolsado y ya no se puede devolver.'
+'This order has not been paid yet and cannot be returned.': 'Este pedido aún no se ha pagado y no se puede devolver.'
+'Another request is being processed on this order, please try again.': 'Se está procesando otra solicitud sobre este pedido, inténtelo de nuevo.'
