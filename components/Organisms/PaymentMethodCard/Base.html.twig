@@ -1,13 +1,14 @@
 {# A payment method the customer asked the shop to keep, on the account page. Same card as the
    address book, so it takes its classes and its confirmation behaviour (the dialog target and
    the action it submits come from the trigger): no style of its own.
-   @prop method array The payment method as the account API reads it: id, label, paymentModuleTitle, expiresAt, isDefault
+   @prop method array The payment method as AccountPaymentMethods gives it: id, label, paymentModuleTitle, expiresAt, expired (bool, the last valid month is past), isDefault, usable (its module still offers to pay with it)
    @prop deleteUrl string POST target of the deletion, confirmed in the dialog `confirmDeletePaymentMethod`
    @prop defaultUrl string POST target of the choice as default method, confirmed in the dialog `confirmDefaultPaymentMethod` #}
 {% props method, deleteUrl, defaultUrl %}
 
 {% set expiresAt = method.expiresAt|default(null) %}
-{% set expired = expiresAt and expiresAt|date('Y-m-d') < 'now'|date('Y-m-d') %}
+
+{% set titleId = 'payment-method-title-' ~ method.id %}
 
 <div
     class="{{ ('AddressCard ' ~ attributes.render('class'))|tailwind_merge }}"
@@ -16,10 +17,12 @@
 >
     <div class="AddressCard-top">
         {% if method.isDefault %}
-            <twig:Molecules:Favorite:Base text="{{ 'Default'|trans }}" selected />
-        {% else %}
+            <twig:Molecules:Favorite:Base text="{{ 'Default'|trans }}" selected aria-pressed="true" aria-disabled="true" aria-describedby="{{ titleId }}" />
+        {% elseif method.usable %}
             <twig:Molecules:Favorite:Base
                 text="{{ 'Default'|trans }}"
+                aria-pressed="false"
+                aria-describedby="{{ titleId }}"
                 data-modal="confirmDefaultPaymentMethod"
                 data-confirm="{{ defaultUrl }}"
                 {{ ...stimulus_action('Organisms--AddressCard--base', 'openModal', 'click') }}
@@ -29,12 +32,12 @@
 
     <div class="AddressCard-content">
         <span>
-            <span class="AddressCard-title"><bdi>{{ method.label }}</bdi></span>
+            <span class="AddressCard-title" id="{{ titleId }}"><bdi>{{ method.label }}</bdi></span>
             <span class="AddressCard-name"><bdi>{{ method.paymentModuleTitle }}</bdi></span>
             {% if expiresAt %}
                 <span class="AddressCard-address">
-                    {% if expired %}
-                        <twig:Molecules:Tag:Base color="error" customText="{{ 'Expired on %date%'|trans({'%date%': expiresAt|date('m/Y')}) }}" />
+                    {% if method.expired %}
+                        <twig:Molecules:Tag:Base color="error" customText="{{ 'Expired (valid until %date%)'|trans({'%date%': expiresAt|date('m/Y')}) }}" />
                     {% else %}
                         {{ 'Expires %date%'|trans({'%date%': expiresAt|date('m/Y')}) }}
                     {% endif %}
@@ -47,6 +50,7 @@
         <button
             type="button"
             {{ stimulus_action('Organisms--AddressCard--base', 'openModal', 'click') }}
+            aria-describedby="{{ titleId }}"
             data-modal="confirmDeletePaymentMethod"
             data-confirm="{{ deleteUrl }}"
         >

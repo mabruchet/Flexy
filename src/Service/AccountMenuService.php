@@ -66,8 +66,9 @@ final readonly class AccountMenuService
         ];
 
         // Decided here, from the shop, and not by a test in the templates: the page exists
-        // only when a payment module keeps payment methods, so the link does too.
-        if ($this->storedPaymentMethods->isOffered()) {
+        // only when a payment module keeps payment methods or the customer holds one, so
+        // the link does too.
+        if ($this->storedPaymentMethods->isAvailable()) {
             array_splice($items, 3, 0, [[
                 'slug' => 'payment-methods',
                 'text' => $this->translator->trans('My payment methods'),
