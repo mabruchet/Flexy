@@ -50,6 +50,17 @@ final class AccountPaymentMethodsTest extends WebIntegrationTestCase
 
     private CustomerSessionInjector $injector;
 
+    public static function setUpBeforeClass(): void
+    {
+        parent::setUpBeforeClass();
+
+        // Only the theme's own bootstrap maps FlexyBundle\Tests\: under the core's PHPUnit
+        // configuration the support class has to be loaded from its file.
+        if (!class_exists(ThrowingStoredMethodsPaymentModule::class)) {
+            require_once \dirname(__DIR__, 2).'/Support/ThrowingStoredMethodsPaymentModule.php';
+        }
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
