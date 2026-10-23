@@ -68,11 +68,19 @@ $loader->addPsr4('FlexyBundle\\Tests\\', __DIR__);
 
 // Same treatment as the core's bootstrap: the generated Propel models of the test database
 // live in a cache directory, and the kernel fails to boot without them on the include path.
-$propelCacheDir = $hostRoot.'/var/propel/test/model';
+// A process running next to others (TEST_TOKEN) has its own models, looked up before the
+// shared ones: classes of a model generated from an older schema must not shadow them.
+$tokenSuffix = class_exists(Thelia\Test\TestToken::class) ? Thelia\Test\TestToken::suffix() : '';
 
-if (is_dir($propelCacheDir)) {
-    $loader->addPsr4('', $propelCacheDir);
-    $loader->addPsr4('TheliaMain\\', $hostRoot.'/var/propel/test/database/TheliaMain');
+foreach (array_unique(['test'.$tokenSuffix, 'test']) as $propelDirectory) {
+    $propelCacheDir = $hostRoot.'/var/propel/'.$propelDirectory.'/model';
+
+    if (is_dir($propelCacheDir)) {
+        $loader->addPsr4('', $propelCacheDir);
+        $loader->addPsr4('TheliaMain\\', $hostRoot.'/var/propel/'.$propelDirectory.'/database/TheliaMain');
+
+        break;
+    }
 }
 
 (new Dotenv())->bootEnv($hostRoot.'/.env');
