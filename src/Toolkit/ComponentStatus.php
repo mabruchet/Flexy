@@ -66,6 +66,9 @@ final class ComponentStatus
             // feature it renders.
             'Organisms/DeliveryDatePicker' => self::READY,
 
+            // The card of a return, shared by the returns of an order and the list of every return.
+            'Organisms/OrderReturnCard' => self::READY,
+
             // The guide waits on the one thing the theme cannot do for a project: being read,
             // then removed. Deleting `components/Toolkit/getting-started.html.twig` retires the
             // page; remove this arm and its SECTIONS entry by hand — nothing here does it for you.
