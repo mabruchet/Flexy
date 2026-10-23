@@ -24,7 +24,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * test in the templates: the page exists only when a payment module keeps payment methods
  * or the customer holds one (StoredPaymentMethodsAvailability), so the link does too.
  */
-final readonly class StoredPaymentMethodsAccountMenuItemProvider implements AccountMenuItemProviderInterface
+final readonly class StoredPaymentMethodsAccountMenuItemProvider implements ShippedAccountMenuItemProviderInterface
 {
     public function __construct(
         private StoredPaymentMethodsAvailability $availability,
