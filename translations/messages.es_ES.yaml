@@ -125,3 +125,16 @@ Currency: Moneda
 '%products% cannot be shipped to this address. Remove them from your cart or choose another address.': "%products% no se pueden enviar a esta dirección. Quítelos de su carrito o elija otra dirección."
 'Not available for your address': "No disponible para su dirección"
 'Nothing was added to your cart: a product cannot be delivered to your address. Remove its line to add the others.': "No se ha añadido nada a su carrito: un producto no se puede entregar en su dirección. Elimine su línea para añadir las demás."
+
+# Payment methods saved by the customer (account)
+'My payment methods': 'Mis métodos de pago'
+'Your payment method has been deleted': 'Su método de pago ha sido eliminado'
+'Your default payment method has been updated': 'Su método de pago predeterminado ha sido actualizado'
+'Your payment provider refused to delete this payment method, it has been kept. Please try again later.': 'Su proveedor de pago se negó a eliminar este método de pago, se ha conservado. Inténtelo de nuevo más tarde.'
+'You have no saved payment method yet': 'Aún no tiene ningún método de pago guardado'
+'A payment method you choose to keep while paying an order will be listed here.': 'Un método de pago que decida conservar al pagar un pedido aparecerá aquí.'
+'Are you sure you want to delete this payment method ?': '¿Está seguro de que desea eliminar este método de pago?'
+'Are you sure you want to choose this payment method by default ?': '¿Está seguro de que desea elegir este método de pago como predeterminado?'
+'Expired on %date%': 'Caducó el %date%'
+'Default': 'Predeterminado'
+'Expires %date%': 'Caduca el %date%'

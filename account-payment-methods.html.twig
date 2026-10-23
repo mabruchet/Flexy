@@ -1,0 +1,100 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ 'My payment methods'|trans }}{% endblock %}
+
+{% block body %}
+    {# paymentMethods comes from the controller, which reads them filtered on the customer and
+       answers 404 when no payment module keeps payment methods. #}
+    {% set notices = {
+        delete_success: {variant: 'success', text: 'Your payment method has been deleted'|trans},
+        default_success: {variant: 'success', text: 'Your default payment method has been updated'|trans},
+        refused: {variant: 'error', text: 'Your payment provider refused to delete this payment method, it has been kept. Please try again later.'|trans},
+        error: {variant: 'error', text: 'An error has occurred, please try again later'|trans},
+    } %}
+
+    <twig:Layouts:Subheader:Account
+        title="{{ 'My payment methods'|trans }}"
+        selected="payment-methods"
+        :breadcrumb="[
+            {title: 'My account'|trans, url: path('account_index')},
+            {title: 'My payment methods'|trans},
+        ]"
+    />
+
+    <div class="container-l pt-6 pb-20 md:pt-11 md:pb-30">
+        <div class="flex flex-col items-center max-w-screen-lg mx-auto">
+            {% for param, notice in notices %}
+                {% if app.request.query.get(param) %}
+                    <twig:Molecules:SnackBar:Base
+                        variant="{{ notice.variant }}"
+                        :withIcon="true"
+                        text="{{ notice.text }}"
+                        class="w-full mb-6"
+                    />
+                {% endif %}
+            {% endfor %}
+
+            {% if paymentMethods|length %}
+                <ul class="grid w-full grid-cols-1 gap-6 sm:grid-cols-2">
+                    {% for method in paymentMethods %}
+                        <li>
+                            <twig:Organisms:PaymentMethodCard:Base
+                                :method="method"
+                                deleteUrl="{{ path('account_payment_method_delete', {methodId: method.id}) }}"
+                                defaultUrl="{{ path('account_payment_method_default', {methodId: method.id}) }}"
+                                class="h-full"
+                            />
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <div class="flex flex-col items-center text-center" data-testid="payment-methods-empty">
+                    <div class="w-36 h-auto lg:w-60">
+                        {{ source('assets/images/nothing.svg') }}
+                    </div>
+                    <h3 class="h3 mt-4 mb-2">{{ 'You have no saved payment method yet'|trans }}</h3>
+                    <p>{{ 'A payment method you choose to keep while paying an order will be listed here.'|trans }}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block footer %}
+    <twig:Layouts:Footer:Checkout />
+{% endblock %}
+
+{% block modals %}
+    {# POST + CSRF: both actions change data, they must not be reachable by navigation #}
+    <twig:Molecules:Modal:Base id="confirmDeletePaymentMethod" labelledby="confirmDeletePaymentMethodTitle">
+        <h2 id="confirmDeletePaymentMethodTitle" class="h4">{{ 'Are you sure you want to delete this payment method ?'|trans }}</h2>
+        <form method="post" {{ stimulus_target('Molecules--Modal--base', 'confirm') }}>
+            <input type="hidden" name="_token" value="{{ csrf_token('payment_method_action') }}">
+            <div class="grid md:grid-cols-2 gap-4 mt-8">
+                <twig:Molecules:Button:Base
+                    text="{{ 'Cancel'|trans }}"
+                    color="secondary"
+                    :fill="true"
+                    {{ ...stimulus_action('Molecules--Modal--base', 'close', 'click') }}
+                />
+                <twig:Molecules:Button:Base text="{{ 'Yes'|trans }}" type="submit" :fill="true" />
+            </div>
+        </form>
+    </twig:Molecules:Modal:Base>
+
+    <twig:Molecules:Modal:Base id="confirmDefaultPaymentMethod" labelledby="confirmDefaultPaymentMethodTitle">
+        <h2 id="confirmDefaultPaymentMethodTitle" class="h4">{{ 'Are you sure you want to choose this payment method by default ?'|trans }}</h2>
+        <form method="post" {{ stimulus_target('Molecules--Modal--base', 'confirm') }}>
+            <input type="hidden" name="_token" value="{{ csrf_token('payment_method_action') }}">
+            <div class="grid md:grid-cols-2 gap-4 mt-8">
+                <twig:Molecules:Button:Base
+                    text="{{ 'Cancel'|trans }}"
+                    color="secondary"
+                    :fill="true"
+                    {{ ...stimulus_action('Molecules--Modal--base', 'close', 'click') }}
+                />
+                <twig:Molecules:Button:Base text="{{ 'Yes'|trans }}" type="submit" :fill="true" />
+            </div>
+        </form>
+    </twig:Molecules:Modal:Base>
+{% endblock %}
