@@ -23,7 +23,7 @@ use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
  * "My returns", right after "My orders", only while the shop offers returns: with the
  * feature off the page behind it answers 404.
  */
-final readonly class OrderReturnsAccountMenuItemProvider implements AccountMenuItemProviderInterface
+final readonly class OrderReturnsAccountMenuItemProvider implements ShippedAccountMenuItemProviderInterface
 {
     public function __construct(
         private ReturnEligibilityChecker $eligibility,

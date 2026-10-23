@@ -16,6 +16,7 @@ namespace FlexyBundle\Tests\Unit\AccountMenu;
 
 use FlexyBundle\AccountMenu\AccountMenuItem;
 use FlexyBundle\AccountMenu\AccountMenuItemProviderInterface;
+use FlexyBundle\AccountMenu\ShippedAccountMenuItemProviderInterface;
 use FlexyBundle\Service\AccountMenuService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -68,6 +69,24 @@ final class AccountMenuServiceTest extends TestCase
 
         self::assertCount(1, $items);
         self::assertSame('/orders', $items[0]->href);
+        self::assertSame(['warning'], $this->logger->levels);
+    }
+
+    public function testAProviderOfAModuleBeatsAShippedEntryOfTheSameSlugWhateverTheOrder(): void
+    {
+        $shipped = new class implements ShippedAccountMenuItemProviderInterface {
+            public function getItems(): iterable
+            {
+                return [new AccountMenuItem('orders', 'My orders', '/orders', 200)];
+            }
+        };
+
+        $service = $this->service($shipped, $this->provider(new AccountMenuItem('orders', 'Module orders', '/module-orders', 200)));
+
+        $items = $service->getItems();
+
+        self::assertCount(1, $items);
+        self::assertSame('/module-orders', $items[0]->href);
         self::assertSame(['warning'], $this->logger->levels);
     }
 

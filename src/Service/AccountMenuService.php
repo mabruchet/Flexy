@@ -16,6 +16,7 @@ namespace FlexyBundle\Service;
 
 use FlexyBundle\AccountMenu\AccountMenuItem;
 use FlexyBundle\AccountMenu\AccountMenuItemProviderInterface;
+use FlexyBundle\AccountMenu\ShippedAccountMenuItemProviderInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\HttpFoundation\Request;
@@ -51,7 +52,8 @@ final readonly class AccountMenuService
 
     /**
      * Ordered by position; entries sharing one keep the order their providers gave them.
-     * A slug given twice keeps its first entry.
+     * A slug given twice keeps one entry: the one of a provider the theme does not ship
+     * when it meets a shipped one, otherwise the first.
      *
      * @return list<AccountMenuItem>
      */
@@ -73,7 +75,7 @@ final readonly class AccountMenuService
     {
         $items = [];
 
-        foreach ($this->providers as $provider) {
+        foreach ($this->providersByPrecedence() as $provider) {
             foreach ($this->itemsOf($provider) as $item) {
                 if (isset($items[$item->slug])) {
                     $this->logger->warning('Account menu entry "{slug}" of {provider} ignored: the slug is already taken.', [
@@ -92,6 +94,29 @@ final readonly class AccountMenuService
         usort($items, static fn (AccountMenuItem $left, AccountMenuItem $right): int => $left->position <=> $right->position);
 
         return $items;
+    }
+
+    /**
+     * The providers of modules before the ones the theme ships, each group in the order
+     * it was given: the first to claim a slug keeps it, so a module overrides a native
+     * entry by naming the same slug, with no dependency on the tag priorities.
+     *
+     * @return list<AccountMenuItemProviderInterface>
+     */
+    private function providersByPrecedence(): array
+    {
+        $others = [];
+        $shipped = [];
+
+        foreach ($this->providers as $provider) {
+            if ($provider instanceof ShippedAccountMenuItemProviderInterface) {
+                $shipped[] = $provider;
+            } else {
+                $others[] = $provider;
+            }
+        }
+
+        return [...$others, ...$shipped];
     }
 
     /**
