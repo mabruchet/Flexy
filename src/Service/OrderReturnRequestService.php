@@ -60,6 +60,7 @@ final readonly class OrderReturnRequestService
         private OrderReturnHydrator $hydrator,
         private EventDispatcherInterface $eventDispatcher,
         private ReturnRequestLimiter $limiter,
+        private OrderReturnAttemptLimiter $attemptLimiter,
     ) {
     }
 
@@ -111,6 +112,12 @@ final readonly class OrderReturnRequestService
             throw new ReturnNotAllowedException('The comment is too long.');
         }
 
+        // Spent before anything reads the database, accepted or not: the transaction below
+        // takes row locks, and the quota of accepted returns does not see a refused request.
+        if (!$this->attemptLimiter->allows($customer)) {
+            throw new TooManyReturnRequestsException('Too many return requests, please try again later.');
+        }
+
         $resource = $this->buildResource($order, $requestedLines, $this->visibleReasonId($reasonId), $resolution, $comment);
 
         // Reading how much of a line is still returnable and writing the return that
@@ -128,6 +135,11 @@ final readonly class OrderReturnRequestService
             // exactly where the core's own OrderReturnFrontCreateProcessor spends it. A form
             // submitted with an ineligible line never reaches this check, so it costs nothing
             // towards the quota an accepted request spends.
+            //
+            // Known limit: the token is not given back when the transaction is rolled back
+            // after this point, by a deadlock (1213, "please try again") for instance. The
+            // limiter has no per-token refund, and resetting the bucket would erase the
+            // customer's whole count, so a customer who retries pays that one request twice.
             if (!$this->limiter->allows($customer)) {
                 throw new TooManyReturnRequestsException('Too many return requests, please try again later.');
             }
