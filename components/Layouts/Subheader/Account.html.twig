@@ -9,19 +9,22 @@
     <div class="container-l flex flex-col items-center gap-10">
         <h1 class="Subheader-title">{{ title }}</h1>
 
-        <ul class="Subheader-links">
-            {% for item in this.items %}
-                <li class="flex-1">
-                    <twig:Molecules:Button:Base
-                        text="{{ item.text }}"
-                        href="{{ item.href }}"
-                        size="small"
-                        :sharp="true"
-                        color="{{ selected == item.slug ? 'base' : 'secondary' }}"
-                        class="w-full h-full"
-                    />
-                </li>
-            {% endfor %}
-        </ul>
+        <nav class="w-full flex justify-center" aria-label="{{ 'My account'|trans }}">
+            <ul class="Subheader-links">
+                {% for item in this.items %}
+                    <li class="flex-1">
+                        <twig:Molecules:Button:Base
+                            text="{{ item.text }}"
+                            href="{{ item.href }}"
+                            size="small"
+                            :sharp="true"
+                            color="{{ selected == item.slug ? 'base' : 'secondary' }}"
+                            class="w-full h-full"
+                            {{ ...(selected == item.slug ? {'aria-current': 'page'} : {}) }}
+                        />
+                    </li>
+                {% endfor %}
+            </ul>
+        </nav>
     </div>
 </div>
