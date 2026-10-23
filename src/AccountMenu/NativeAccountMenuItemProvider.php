@@ -23,7 +23,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  * positions leave room between them: "My returns" sits at 250 and "My payment methods"
  * at 400, and an entry of another provider slots in by position the same way.
  */
-final readonly class NativeAccountMenuItemProvider implements AccountMenuItemProviderInterface
+final readonly class NativeAccountMenuItemProvider implements ShippedAccountMenuItemProviderInterface
 {
     public function __construct(
         private UrlGeneratorInterface $urlGenerator,
