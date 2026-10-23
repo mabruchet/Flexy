@@ -138,3 +138,8 @@ Currency: Valuta
 'Expired (valid until %date%)': 'Scaduto (valido fino a %date%)'
 'Default': 'Predefinito'
 'Expires %date%': 'Scade il %date%'
+'My account': 'Il mio account'
+'An error has occurred, please try again later': 'Si è verificato un errore, riprova più tardi'
+'Cancel': 'Annulla'
+'Yes': 'Sì'
+'Delete': 'Elimina'

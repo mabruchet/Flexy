@@ -138,3 +138,8 @@ Currency: Moneda
 'Expired (valid until %date%)': 'Caducado (válido hasta %date%)'
 'Default': 'Predeterminado'
 'Expires %date%': 'Caduca el %date%'
+'My account': 'Mi cuenta'
+'An error has occurred, please try again later': 'Se ha producido un error, inténtelo de nuevo más tarde'
+'Cancel': 'Cancelar'
+'Yes': 'Sí'
+'Delete': 'Eliminar'
