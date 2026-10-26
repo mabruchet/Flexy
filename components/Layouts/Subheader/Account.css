@@ -9,8 +9,9 @@
 .Subheader-links {
   display: flex;
   width: 100%;
-  /* Up to seven entries: the payment methods and the returns join the account when the shop offers them. */
-  max-width: 60rem;
+  /* Up to seven entries: the payment methods and the returns join the account when the shop offers them.
+     No fixed cap: the row is bounded by its container and each tab sizes to its label. */
+  max-width: 100%;
   flex-direction: column;
   align-items: stretch;
   border: 1px solid var(--color-black);
@@ -36,6 +37,18 @@
 
     & > :last-child .button {
       border-inline-end: none;
+    }
+  }
+
+  /* Wide enough for the whole row: a label stays on one line, and each tab takes the width
+     of its label instead of an equal share that a long one overflows. */
+  @variant lg {
+    & > li {
+      flex: 1 1 auto;
+    }
+
+    & .button {
+      white-space: nowrap;
     }
   }
 }
