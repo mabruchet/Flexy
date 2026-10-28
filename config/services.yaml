@@ -27,3 +27,11 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    # The brake on every submission of the return request form, accepted or not: the core's
+    # per-client limiter (the authenticated customer, else the client IP) fed with the theme's
+    # own, wider, rate limiter instead of the core's quota of accepted returns.
+    flexy.order_return_attempt_limiter:
+        class: Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter
+        arguments:
+            $perClientLimiter: '@limiter.flexy_order_return_attempt'

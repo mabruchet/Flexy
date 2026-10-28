@@ -16,6 +16,7 @@ namespace FlexyBundle\Service;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
 use Propel\Runtime\Connection\ConnectionInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Thelia\Api\Resource\Order as OrderResource;
 use Thelia\Api\Resource\OrderProduct as OrderProductResource;
 use Thelia\Api\Resource\OrderReturn as OrderReturnResource;
@@ -59,7 +60,8 @@ final readonly class OrderReturnRequestService
         private OrderReturnHydrator $hydrator,
         private OrderReturnWriteTransactionInterface $transaction,
         private ReturnRequestLimiter $limiter,
-        private OrderReturnAttemptLimiter $attemptLimiter,
+        #[Autowire(service: 'flexy.order_return_attempt_limiter')]
+        private ReturnRequestLimiter $attemptLimiter,
         private OrderReturnHistoryRecorder $historyRecorder,
         private OrderReturnStatusEmailDispatcher $statusEmailDispatcher,
     ) {

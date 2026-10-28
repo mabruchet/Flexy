@@ -188,6 +188,19 @@ final class OrderReturnWriteTransactionPathTest extends IntegrationTestCase
         self::assertSame([(int) $return->getId()], $mailed, 'One mail, about the return that was just written.');
     }
 
+    public function testTheBrakeOnAttemptsIsTheThemesOwnAndWiderThanTheQuotaOfAcceptedReturns(): void
+    {
+        $limiter = (new \ReflectionProperty(OrderReturnRequestService::class, 'attemptLimiter'))->getValue($this->service());
+        // A customer no other test used: the rate limiter state outlives the rolled back fixtures.
+        $stranger = (new Customer())->setId(random_int(900_000_000, 999_999_999));
+
+        for ($attempt = 1; $attempt <= 60; ++$attempt) {
+            self::assertTrue($limiter->allows($stranger), 'The theme allows sixty attempts an hour; refused at '.$attempt.'.');
+        }
+
+        self::assertFalse($limiter->allows($stranger), 'The sixty-first is braked.');
+    }
+
     private function service(?OrderReturnWriteTransactionInterface $transaction = null): OrderReturnRequestService
     {
         if (null === $transaction) {
