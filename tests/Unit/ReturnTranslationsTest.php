@@ -21,7 +21,8 @@ use Symfony\Component\Yaml\Yaml;
 /**
  * The core states the refusals of a return in English and the theme carries their
  * translation: a refusal missing from a catalog reaches the customer untranslated. The
- * sentences below are the ones the core throws, word for word.
+ * sentences below are the ones the core throws, word for word, with the texts of the returns
+ * pages and of the request form, which every catalog carries too.
  */
 final class ReturnTranslationsTest extends TestCase
 {
@@ -35,6 +36,49 @@ final class ReturnTranslationsTest extends TestCase
         'This order has already been refunded and can no longer be returned.',
         'This order has not been paid yet and cannot be returned.',
         'Another request is being processed on this order, please try again.',
+        'Returns',
+        'Return %ref%',
+        'Request a return',
+        'Return request',
+        'Products to return',
+        'Quantity to return (up to %quantity%)',
+        'Reason for the return',
+        'Select a reason',
+        'What do you expect?',
+        'What you wish to receive in exchange',
+        'A refund',
+        'A store credit',
+        'An exchange',
+        'Comment',
+        'Anything the shop should know about this return',
+        'Send my return request',
+        'Your return request has been sent. You will be notified as soon as it has been reviewed.',
+        'Reason given by the shop',
+        'Returned products',
+        'Refundable amount',
+        'Back to the order',
+        'Download the return document',
+        'Select at least one product to return.',
+        'The expected resolution is not one the shop offers.',
+        'The comment is too long.',
+        'The wished exchange is too long.',
+        'Too many return requests, please try again later.',
+        'The return could not be opened.',
+        'The product returns feature is disabled.',
+        'This order cannot be used for a return.',
+        'The return window for this order has closed.',
+        'A virtual product cannot be returned.',
+        'The returned quantity must be positive.',
+        'The returned quantity exceeds the returnable quantity of this line.',
+        'The order does not exist.',
+        'Unknown order product in a return line.',
+        'This product line does not belong to the order.',
+        'The postage of this order is already included in another return.',
+        'Return %product%',
+        'My orders',
+        'Order N°',
+        'Quantity',
+        'label_colon',
     ];
 
     #[DataProvider('everyLocaleAndKey')]
