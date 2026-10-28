@@ -28,6 +28,7 @@ use Thelia\Config\DatabaseConfiguration;
 use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
+use Thelia\Domain\OrderReturn\Service\OrderReturnHistoryRecorder;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
 use Thelia\Model\Customer;
@@ -61,6 +62,7 @@ final readonly class OrderReturnRequestService
         private EventDispatcherInterface $eventDispatcher,
         private ReturnRequestLimiter $limiter,
         private OrderReturnAttemptLimiter $attemptLimiter,
+        private OrderReturnHistoryRecorder $historyRecorder,
     ) {
     }
 
@@ -162,8 +164,13 @@ final readonly class OrderReturnRequestService
             throw $exception;
         }
 
-        // Announced once the return is committed, never from inside the transaction:
-        // a mail is not something a rollback takes back.
+        // Announced once the return is committed, never from inside the transaction: a mail
+        // is not something a rollback takes back, and a line written inside it would go with
+        // one. The line that opens the return on the history of its order comes first, so the
+        // timeline shows the gesture before the mail that follows it, as the core's API
+        // processors do. ORDER_RETURN_CREATE is not dispatched here, since the return is
+        // already written: its listener would write that line and send the mail a second time.
+        $this->historyRecorder->recordOpened($model);
         $this->eventDispatcher->dispatch(new OrderReturnEvent($model), TheliaEvents::ORDER_RETURN_SEND_STATUS_EMAIL);
 
         return $model;
