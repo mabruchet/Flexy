@@ -26,4 +26,8 @@ class Base
     public string $description = '';
     public string $price = '';
     public bool $checked = false;
+    /** The first day the parcel may arrive, Y-m-d, empty when the option gives no estimate. */
+    public string $earliestDelivery = '';
+    /** The last day the parcel may arrive, Y-m-d, empty when the option gives no estimate. */
+    public string $latestDelivery = '';
 }

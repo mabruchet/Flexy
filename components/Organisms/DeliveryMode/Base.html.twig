@@ -27,6 +27,16 @@
                     </span>
                 {% endif %}
             </span>
+            {% if this.earliestDelivery and this.latestDelivery %}
+                {% set earliestDay = this.earliestDelivery|format_date(pattern: 'EEEE d MMMM', locale: lang_code ?? null) %}
+                <span class="DeliveryMode-estimate" data-testid="delivery-estimate">
+                    {% if this.earliestDelivery == this.latestDelivery %}
+                        {{ 'delivery_estimation_day'|trans({'%date%': earliestDay}) }}
+                    {% else %}
+                        {{ 'delivery_estimation'|trans({'%min%': earliestDay, '%max%': this.latestDelivery|format_date(pattern: 'EEEE d MMMM', locale: lang_code ?? null)}) }}
+                    {% endif %}
+                </span>
+            {% endif %}
             <span class="flex items-center mt-6">
                 <span class="DeliveryMode-price">
                     {% if this.price %}

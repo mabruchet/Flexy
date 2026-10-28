@@ -274,6 +274,7 @@ Previous Step: Vorheriger Schritt
 Checkout: Kasse
 Choose a carrier: Versanddienstleister wählen
 delivery_estimation: Lieferung voraussichtlich zwischen %min% und %max%
+delivery_estimation_day: Lieferung voraussichtlich am %date%
 No available carrier for your current address.: Für Ihre aktuelle Adresse ist kein Versanddienstleister verfügbar. Bitte wählen Sie eine andere Adresse.
 Choose a payment method: Zahlungsart wählen
 Your cart is curently empty: Ihr Warenkorb ist leer

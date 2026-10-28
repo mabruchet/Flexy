@@ -17,6 +17,7 @@ namespace FlexyBundle\Components\Organisms\Delivery;
 use FlexyBundle\Event\CheckoutEvents;
 use FlexyBundle\Service\DeliveryAddressCopy;
 use FlexyBundle\Service\DeliveryDateBridge;
+use FlexyBundle\Service\DeliveryEstimate;
 use FlexyBundle\Service\DeliveryOptionChoice;
 use FlexyBundle\Service\GuestCheckoutGate;
 use Propel\Runtime\Exception\PropelException;
@@ -225,6 +226,7 @@ class Base
 
             foreach ($options as $option) {
                 $code = $option->getCode();
+                $estimate = DeliveryEstimate::of($option->getMinimumDeliveryDate(), $option->getMaximumDeliveryDate());
                 $deliveryOptions[$code] = [
                     'code' => $code,
                     'title' => $title,
@@ -237,6 +239,10 @@ class Base
                     // What the buyer picks with this carrier: none, a day, or a slot. A core
                     // that predates delivery dates answers nothing, which is none.
                     'deliveryDateChoice' => method_exists($module, 'getDeliveryDateChoice') ? $module->getDeliveryDateChoice() : 'none',
+                    // The days the parcel is expected between, when something filled the two
+                    // dates of the option; empty otherwise, and the card then says nothing.
+                    'earliestDelivery' => $estimate['earliest'] ?? '',
+                    'latestDelivery' => $estimate['latest'] ?? '',
                 ];
             }
         }

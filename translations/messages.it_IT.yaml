@@ -146,3 +146,5 @@ Currency: Valuta
 Close: Chiudi
 'You seem to be in %country%.': 'Sembra che tu sia in %country%.'
 'See prices for %country%': 'Vedi i prezzi per %country%'
+delivery_estimation: Consegna prevista tra %min% e %max%
+delivery_estimation_day: Consegna prevista il %date%

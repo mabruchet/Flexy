@@ -42,6 +42,17 @@ class Pickup
     #[LiveProp(updateFromParent: true)]
     public string $price = '';
 
+    /** Read by the card it extends, which a carrier of this kind never describes. */
+    public string $description = '';
+
+    /** The first day the parcel may arrive, Y-m-d, empty when the option gives no estimate. */
+    #[LiveProp(updateFromParent: true)]
+    public string $earliestDelivery = '';
+
+    /** The last day the parcel may arrive, Y-m-d, empty when the option gives no estimate. */
+    #[LiveProp(updateFromParent: true)]
+    public string $latestDelivery = '';
+
     public function __construct(
         private readonly CartFacade $cartFacade,
     ) {

@@ -260,6 +260,7 @@ Previous Step: Étape précédente
 Checkout: Tunnel d'achat
 Choose a carrier: Choisir un transporteur
 delivery_estimation: Livraison prévue entre le %min% et le %max%
+delivery_estimation_day: Livraison prévue le %date%
 No available carrier for your current address.: Aucun de nos transporteurs ne pourra effectuer la livraison à cette adresse. Veuilliez en selectionner une autre.
 Choose a payment method: Choisissez un mode de paiement
 Your cart is curently empty: Votre panier est vide.

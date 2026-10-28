@@ -274,6 +274,7 @@ Previous Step: Previous Step
 Checkout: Checkout
 Choose a carrier: Choose a carrier
 delivery_estimation: Delivery scheduled between %min% and %max%
+delivery_estimation_day: Delivery scheduled on %date%
 No available carrier for your current address.: No available carrier for your current address. Please choose an another one.
 Choose a payment method: Choose a payment method
 Your cart is curently empty: Your cart is curently empty

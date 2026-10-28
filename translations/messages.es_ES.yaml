@@ -146,3 +146,5 @@ Currency: Moneda
 Close: Cerrar
 'You seem to be in %country%.': 'Parece que estás en %country%.'
 'See prices for %country%': 'Ver precios para %country%'
+delivery_estimation: Entrega prevista entre el %min% y el %max%
+delivery_estimation_day: Entrega prevista el %date%
