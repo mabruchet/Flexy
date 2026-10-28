@@ -17,6 +17,7 @@ namespace FlexyBundle\Tests\Integration;
 use FlexyBundle\Service\OrderReturnRequestService;
 use Propel\Runtime\Connection\ConnectionInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
+use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Domain\Order\Enum\OrderHistoryEventType;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
@@ -168,6 +169,23 @@ final class OrderReturnWriteTransactionPathTest extends IntegrationTestCase
 
         self::assertSame([], $spy->calls, 'No transaction is opened on the order of somebody else.');
         self::assertSame([], array_filter($statements, static fn (string $statement): bool => str_contains($statement, 'FOR UPDATE')), 'And no row of it is locked.');
+    }
+
+    public function testTheCustomerIsMailedOnceOnceTheReturnIsWritten(): void
+    {
+        [$customer, $order, $lines] = $this->paidOrderWithTwoLines();
+        $mailed = [];
+        self::getContainer()->get(EventDispatcherInterface::class)->addListener(
+            TheliaEvents::ORDER_RETURN_SEND_STATUS_EMAIL,
+            static function (OrderReturnEvent $event) use (&$mailed): void {
+                $mailed[] = (int) $event->getOrderReturn()->getId();
+            },
+            1024,
+        );
+
+        $return = $this->service()->open($order, $customer, [(int) $lines[0]->getId() => 1.0], null, 'refund', null);
+
+        self::assertSame([(int) $return->getId()], $mailed, 'One mail, about the return that was just written.');
     }
 
     private function service(?OrderReturnWriteTransactionInterface $transaction = null): OrderReturnRequestService

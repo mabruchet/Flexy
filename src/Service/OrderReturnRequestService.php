@@ -16,17 +16,15 @@ namespace FlexyBundle\Service;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
 use Propel\Runtime\Connection\ConnectionInterface;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Resource\Order as OrderResource;
 use Thelia\Api\Resource\OrderProduct as OrderProductResource;
 use Thelia\Api\Resource\OrderReturn as OrderReturnResource;
 use Thelia\Api\Resource\OrderReturnLine as OrderReturnLineResource;
 use Thelia\Api\Resource\OrderReturnReason as OrderReturnReasonResource;
 use Thelia\Api\Service\OrderReturnHydrator;
-use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
-use Thelia\Core\Event\TheliaEvents;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
 use Thelia\Domain\OrderReturn\Service\OrderReturnHistoryRecorder;
+use Thelia\Domain\OrderReturn\Service\OrderReturnStatusEmailDispatcher;
 use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransactionInterface;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
@@ -59,11 +57,11 @@ final readonly class OrderReturnRequestService
     public function __construct(
         private ReturnEligibilityChecker $eligibility,
         private OrderReturnHydrator $hydrator,
-        private EventDispatcherInterface $eventDispatcher,
         private OrderReturnWriteTransactionInterface $transaction,
         private ReturnRequestLimiter $limiter,
         private OrderReturnAttemptLimiter $attemptLimiter,
         private OrderReturnHistoryRecorder $historyRecorder,
+        private OrderReturnStatusEmailDispatcher $statusEmailDispatcher,
     ) {
     }
 
@@ -177,7 +175,7 @@ final readonly class OrderReturnRequestService
         // processors do. ORDER_RETURN_CREATE is not dispatched here, since the return is
         // already written: its listener would write that line and send the mail a second time.
         $this->historyRecorder->recordOpened($model);
-        $this->eventDispatcher->dispatch(new OrderReturnEvent($model), TheliaEvents::ORDER_RETURN_SEND_STATUS_EMAIL);
+        $this->statusEmailDispatcher->dispatchFor($model);
 
         return $model;
     }

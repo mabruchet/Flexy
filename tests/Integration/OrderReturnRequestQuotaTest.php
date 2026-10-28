@@ -20,10 +20,10 @@ use FlexyBundle\Service\OrderReturnRequestService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Service\OrderReturnHydrator;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
 use Thelia\Domain\OrderReturn\Service\OrderReturnHistoryRecorder;
+use Thelia\Domain\OrderReturn\Service\OrderReturnStatusEmailDispatcher;
 use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransactionInterface;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
@@ -138,7 +138,6 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
         return new OrderReturnRequestService(
             $container->get(ReturnEligibilityChecker::class),
             $container->get(OrderReturnHydrator::class),
-            $container->get(EventDispatcherInterface::class),
             $container->get(OrderReturnWriteTransactionInterface::class),
             $limiter,
             $attemptLimiter ?? new OrderReturnAttemptLimiter(
@@ -146,6 +145,7 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
                 new RequestStack(),
             ),
             $container->get(OrderReturnHistoryRecorder::class),
+            $container->get(OrderReturnStatusEmailDispatcher::class),
         );
     }
 
