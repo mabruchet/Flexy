@@ -39,7 +39,9 @@ use Thelia\Test\Trait\RecordsSqlQueries;
  * A return opened from the account form is written the way the core's front processor
  * writes one: in the core's write transaction, the order and its lines locked before
  * anything is read, a lock conflict answered as a refusal, and the customer mailed once
- * through the core's dispatcher. Runs on an installed shop (bin/test-prepare).
+ * through the core's dispatcher. Runs inside the test transaction, where the core's write
+ * transaction is always nested: see OrderReturnWriteTransactionOutermostTest for the outermost
+ * one. Runs on an installed shop (bin/test-prepare).
  */
 final class OrderReturnWriteTransactionPathTest extends IntegrationTestCase
 {
@@ -102,9 +104,11 @@ final class OrderReturnWriteTransactionPathTest extends IntegrationTestCase
         self::assertStringContainsString('FROM `order_product` WHERE', $firstThree[1], 'Then its lines.');
         self::assertStringContainsString('FROM `order_product` WHERE', $firstThree[2]);
 
-        // Under REPEATABLE READ the first plain read fixes what the transaction sees: nothing
-        // that belongs to the return may be read before the last lock is held. The only read
-        // allowed earlier is the plain, lock-free one of the line ids, outside the transaction.
+        // Nothing that belongs to the return may be read before the last lock is held. The test
+        // runs inside the test transaction, so the core's transaction is nested here: it does not
+        // read the line ids beforehand and does not promise that a plain read sees every commit.
+        // The outermost path, the one production takes, is checked by
+        // OrderReturnWriteTransactionOutermostTest, outside any transaction.
         foreach ($statements as $index => $statement) {
             if ($index >= $locks[2]) {
                 break;
