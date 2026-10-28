@@ -119,7 +119,7 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
             }
         }
 
-        $statements = $this->recordSqlQueries(function () use ($service, $order, $customer, $ineligible): void {
+        $statements = $this->recordSqlQueries(static function () use ($service, $order, $customer, $ineligible): void {
             try {
                 $service->open($order, $customer, $ineligible, null, 'refund', null);
                 self::fail('The fourth attempt was expected to be braked.');
