@@ -23,6 +23,7 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Service\OrderReturnHydrator;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
+use Thelia\Domain\OrderReturn\Service\OrderReturnHistoryRecorder;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
 use Thelia\Model\ConfigQuery;
@@ -142,6 +143,7 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
                 new RateLimiterFactory(['id' => 'attempts', 'policy' => 'no_limit'], new InMemoryStorage()),
                 new RequestStack(),
             ),
+            $container->get(OrderReturnHistoryRecorder::class),
         );
     }
 
