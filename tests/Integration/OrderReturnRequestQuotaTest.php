@@ -15,7 +15,6 @@ declare(strict_types=1);
 namespace FlexyBundle\Tests\Integration;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
-use FlexyBundle\Service\OrderReturnAttemptLimiter;
 use FlexyBundle\Service\OrderReturnRequestService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
@@ -105,7 +104,7 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
     public function testRefusedRequestsInARowAreBrakedBeforeTheDatabaseIsTouched(): void
     {
         [$customer, $order, $line] = $this->paidOrderWithOneLine(1.0);
-        $attempts = new OrderReturnAttemptLimiter(
+        $attempts = new ReturnRequestLimiter(
             new RateLimiterFactory(['id' => 'attempts', 'policy' => 'sliding_window', 'limit' => 3, 'interval' => '1 hour'], new InMemoryStorage()),
             new RequestStack(),
         );
@@ -131,7 +130,7 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
         self::assertSame([], $statements, 'A braked attempt takes no lock and runs no query.');
     }
 
-    private function service(ReturnRequestLimiter $limiter, ?OrderReturnAttemptLimiter $attemptLimiter = null): OrderReturnRequestService
+    private function service(ReturnRequestLimiter $limiter, ?ReturnRequestLimiter $attemptLimiter = null): OrderReturnRequestService
     {
         $container = self::getContainer();
 
@@ -140,7 +139,7 @@ final class OrderReturnRequestQuotaTest extends IntegrationTestCase
             $container->get(OrderReturnHydrator::class),
             $container->get(OrderReturnWriteTransactionInterface::class),
             $limiter,
-            $attemptLimiter ?? new OrderReturnAttemptLimiter(
+            $attemptLimiter ?? new ReturnRequestLimiter(
                 new RateLimiterFactory(['id' => 'attempts', 'policy' => 'no_limit'], new InMemoryStorage()),
                 new RequestStack(),
             ),
