@@ -16,7 +16,6 @@ namespace FlexyBundle\Service;
 
 use FlexyBundle\Exception\TooManyReturnRequestsException;
 use Propel\Runtime\Connection\ConnectionInterface;
-use Propel\Runtime\Propel;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 use Thelia\Api\Resource\Order as OrderResource;
 use Thelia\Api\Resource\OrderProduct as OrderProductResource;
@@ -24,11 +23,11 @@ use Thelia\Api\Resource\OrderReturn as OrderReturnResource;
 use Thelia\Api\Resource\OrderReturnLine as OrderReturnLineResource;
 use Thelia\Api\Resource\OrderReturnReason as OrderReturnReasonResource;
 use Thelia\Api\Service\OrderReturnHydrator;
-use Thelia\Config\DatabaseConfiguration;
 use Thelia\Core\Event\OrderReturn\OrderReturnEvent;
 use Thelia\Core\Event\TheliaEvents;
 use Thelia\Domain\OrderReturn\Exception\ReturnNotAllowedException;
 use Thelia\Domain\OrderReturn\Service\OrderReturnHistoryRecorder;
+use Thelia\Domain\OrderReturn\Service\OrderReturnWriteTransactionInterface;
 use Thelia\Domain\OrderReturn\Service\ReturnEligibilityChecker;
 use Thelia\Domain\OrderReturn\Service\ReturnRequestLimiter;
 use Thelia\Model\Customer;
@@ -41,11 +40,12 @@ use Thelia\Model\OrderReturnReasonQuery;
  * Opens a return request on behalf of the signed-in customer.
  *
  * Nothing about what may be returned is decided here: the core owns that, and this
- * service walks the same path the front API does — the eligibility gate, the line
- * hydrator that re-reads the returnable quantity under a row lock, and the persist
- * processor — so the theme cannot let through what the API refuses. Only the
- * orchestration differs: the API processor reads its customer from the JWT token
- * storage, which a front-office session does not fill, so the customer is passed in.
+ * service walks the same path the front API does — the core's write transaction (rows
+ * locked before anything is read), the eligibility gate and the line hydrator, the
+ * request quota, then the mail and the history line once committed — so the theme cannot
+ * let through what the API refuses. Only the orchestration differs: the API processor
+ * reads its customer from the JWT token storage, which a front-office session does not
+ * fill, so the customer is passed in.
  */
 final readonly class OrderReturnRequestService
 {
@@ -60,6 +60,7 @@ final readonly class OrderReturnRequestService
         private ReturnEligibilityChecker $eligibility,
         private OrderReturnHydrator $hydrator,
         private EventDispatcherInterface $eventDispatcher,
+        private OrderReturnWriteTransactionInterface $transaction,
         private ReturnRequestLimiter $limiter,
         private OrderReturnAttemptLimiter $attemptLimiter,
         private OrderReturnHistoryRecorder $historyRecorder,
@@ -87,7 +88,9 @@ final readonly class OrderReturnRequestService
     /**
      * @param array<int, float> $requestedLines quantity to return, keyed by order product id
      *
-     * @throws ReturnNotAllowedException      when the request breaks a return rule
+     * @throws ReturnNotAllowedException      when the request breaks a return rule, or a lock conflict
+     *                                        with another request on the order made the database give up
+     *                                        (ReturnRequestConflictException: nothing was written)
      * @throws TooManyReturnRequestsException when the caller asked too often
      */
     public function open(
@@ -130,16 +133,24 @@ final readonly class OrderReturnRequestService
             throw new TooManyReturnRequestsException('Too many return requests, please try again later.');
         }
 
+        // A foreign order is refused before any lock, like the core's front processor does:
+        // naming somebody else's order must not let a caller hold it, even for the length of
+        // a refusal. The controller already hands over the customer's own order.
+        if ((int) $order->getCustomerId() !== (int) $customer->getId()) {
+            throw new ReturnNotAllowedException(ReturnEligibilityChecker::ORDER_NOT_USABLE_MESSAGE);
+        }
+
         $resource = $this->buildResource($order, $requestedLines, $this->visibleReasonId($reasonId), $resolution, $comment, $expectedExchange);
+
+        [$orderId, $orderProductIds] = OrderReturnHydrator::rowsToLock($resource);
 
         // Reading how much of a line is still returnable and writing the return that
         // consumes it are one step, or two requests arriving together are both allowed
-        // the same last unit. The hydrator locks each order product row it reads, and a
-        // lock outside a transaction is released as soon as it is taken.
-        $connection = Propel::getWriteConnection(DatabaseConfiguration::THELIA_CONNECTION_NAME);
-        $connection->beginTransaction();
-
-        try {
+        // the same last unit. The core's transaction locks the order, then its lines by
+        // increasing id, before anything is read, and turns a deadlock or a stale row (1213,
+        // 1020) into a refusal the customer can retry: a ReturnRequestConflictException is
+        // a ReturnNotAllowedException, which the controller already shows.
+        $model = $this->transaction->run($orderId, $orderProductIds, function (ConnectionInterface $connection) use ($resource, $order, $customer): OrderReturnModel {
             $this->hydrator->hydrate($resource, $customer, false);
 
             // The quota counts the returns a customer opens, not the mistakes they make
@@ -156,13 +167,8 @@ final readonly class OrderReturnRequestService
                 throw new TooManyReturnRequestsException('Too many return requests, please try again later.');
             }
 
-            $model = $this->persist($resource, $order, $customer, $connection);
-            $connection->commit();
-        } catch (\Throwable $exception) {
-            $connection->rollBack();
-
-            throw $exception;
-        }
+            return $this->persist($resource, $order, $customer, $connection);
+        });
 
         // Announced once the return is committed, never from inside the transaction: a mail
         // is not something a rollback takes back, and a line written inside it would go with
